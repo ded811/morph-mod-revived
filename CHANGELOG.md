@@ -8,13 +8,13 @@ The first release, for **Minecraft 26.2 and 26.3** on **Fabric**.
 is for 26.2 and `morph-mod-revived-0.1.0-beta+mc26.3.jar` is for 26.3. Each one
 only loads on the version in its name. The two jars have the same features.
 
-**What it does:** kill a mob and you can become it. Every creature you kill
-joins your collection of morphs, and your body changes into the new shape over
+**What it does:** kill a mob and you can become it. The mobs you kill join
+your collection of morphs, and your body changes into the new shape over
 a few seconds while other players watch. Open the selector to switch between
 your collected forms, or go back to your own skin at any time. You get the
 shape's size and its passive abilities, like flight, wall-climbing, water
-breathing, fire immunity and burning in sunlight. It works on any living
-creature, including modded mobs and other players.
+breathing, fire immunity and burning in sunlight. It works on mobs from
+other mods too, and on other players.
 
 **This is a beta, and an unofficial revival.** It's playable, but not finished,
 and it isn't a 1:1 copy of the 1.6.4 original:
@@ -24,7 +24,8 @@ and it isn't a 1:1 copy of the 1.6.4 original:
 - If a morph's mob can't be loaded, for example because its mod was removed,
   the morph waits in your list until the mob is back, instead of turning you
   into a pig.
-- Several config defaults are different from the original.
+- Baby mobs can be collected, and you can sleep in a bed while morphed; the
+  original had both off by default. A few other details differ too.
 
 Please report bugs on the
 [issue tracker](https://github.com/ded811/morph-mod-revived/issues).

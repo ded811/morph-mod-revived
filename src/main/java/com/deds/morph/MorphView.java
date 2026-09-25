@@ -4,15 +4,21 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.EntityReference;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.NeutralMob;
 import net.minecraft.world.entity.ai.targeting.TargetingConditions;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.AABB;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
+import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -30,9 +36,18 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class MorphView {
 
     /** Per-variant probe dummy (level-independent class/type checks); cached so a
-     *  selector probe does not rebuild an entity per candidate per tick. */
-    private static final Map<MorphVariant, LivingEntity> DUMMY_CACHE =
-            new ConcurrentHashMap<>();
+     *  selector probe does not rebuild an entity per candidate per tick. An empty
+     *  entry remembers a variant whose dummy cannot be built, so it is not
+     *  retried (and its stack trace logged) every tick. Cleared with the server
+     *  state: a dummy holds its level, and a singleplayer world closed and
+     *  another opened used to keep the old world in memory. */
+    private static final Map<net.minecraft.resources.ResourceKey<net.minecraft.world.level.Level>,
+            Map<MorphVariant, Optional<LivingEntity>>> DUMMY_CACHE = new ConcurrentHashMap<>();
+
+    /** Mobs the hunt bridge aimed at a morphed player, and that player's UUID.
+     *  When the player changes form, these let go (see {@link #releaseHunters}). */
+    private static final Map<Mob, UUID> HUNTERS =
+            Collections.synchronizedMap(new WeakHashMap<>());
 
     private MorphView() {
     }
@@ -93,8 +108,66 @@ public final class MorphView {
         if (variant.isEmpty()) {
             return null;
         }
-        return DUMMY_CACHE.computeIfAbsent(variant.get(),
-                v -> MorphEntities.create(v, player.level()));
+        // One probe per dimension: keyed by variant alone, two players wearing
+        // the same form in different dimensions rebuilt it on every call.
+        LivingEntity dummy = DUMMY_CACHE
+                .computeIfAbsent(player.level().dimension(), d -> new ConcurrentHashMap<>())
+                .computeIfAbsent(variant.get(),
+                        v -> Optional.ofNullable(MorphEntities.create(v, player.level())))
+                .orElse(null);
+        if (dummy != null) {
+            // Vanilla selectors may read the candidate's position (a guardian's
+            // range floor), so the probe stands where the player stands.
+            dummy.snapTo(player.getX(), player.getY(), player.getZ(),
+                    player.getYRot(), player.getXRot());
+        }
+        return dummy;
+    }
+
+    /** Drops the probe dummies and hunter records (server start and stop). */
+    public static void clearCaches() {
+        DUMMY_CACHE.clear();
+        HUNTERS.clear();
+    }
+
+    /** Records that the hunt bridge aimed {@code mob} at {@code player}. */
+    public static void recordHunter(Mob mob, Player player) {
+        HUNTERS.put(mob, player.getUUID());
+    }
+
+    /**
+     * The player changed form: every mob the hunt bridge set on them lets go.
+     * A wolf or golem that hunted a sheep- or zombie-shaped player also became
+     * persistently angry at that player (vanilla, on any player target), and
+     * kept chasing them for up to 40 seconds after they changed back. A mob that
+     * still matches the new form simply picks the player up again.
+     */
+    public static void releaseHunters(Player player) {
+        UUID id = player.getUUID();
+        List<Mob> hunters = new ArrayList<>();
+        synchronized (HUNTERS) {
+            HUNTERS.entrySet().removeIf(entry -> {
+                if (id.equals(entry.getValue())) {
+                    hunters.add(entry.getKey());
+                    return true;
+                }
+                return false;
+            });
+        }
+        for (Mob mob : hunters) {
+            if (mob.getLastHurtByMob() == player) {
+                continue; // the player really hit it: that anger is not ours to forgive
+            }
+            if (mob.getTarget() == player) {
+                mob.setTarget(null);
+            }
+            if (mob instanceof NeutralMob neutral) {
+                EntityReference<LivingEntity> anger = neutral.getPersistentAngerTarget();
+                if (anger != null && id.equals(anger.getUUID())) {
+                    neutral.stopBeingAngry();
+                }
+            }
+        }
     }
 
     /** True if the goal's own species selector accepts this morph (selector wall).

@@ -66,8 +66,9 @@ public final class MorphAbilitiesClient {
             player.setDeltaMovement(m.x * 0.65, m.y * 0.2, m.z * 0.65);
         }
 
-        if (player.getAbilities().flying) {
-            return; // creative/morph flight overrides the fall/climb clamps
+        if (player.getAbilities().flying || player.isFallFlying()) {
+            return; // creative/morph flight and elytra gliding override the
+                    // fall/climb clamps (a chicken morph could not dive)
         }
 
         // float: clamp the fall to the morph's exact terminal velocity.

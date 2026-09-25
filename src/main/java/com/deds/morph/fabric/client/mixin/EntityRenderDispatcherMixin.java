@@ -44,13 +44,16 @@ public abstract class EntityRenderDispatcherMixin {
                 || !(entity instanceof AbstractClientPlayer player)) {
             return;
         }
-        MorphDummies.Plan plan =
-                MorphDummies.renderPlan(player, partialTick);
-        if (plan == null) {
-            return; // unmorphed (or unrenderable morph): vanilla player
-        }
         EntityRenderDispatcher self = (EntityRenderDispatcher) (Object) this;
         try {
+            // Inside the guard: building the plan poses the dummy (equipment,
+            // carried block, sleeping pose), and a mob whose setters throw must
+            // be quarantined, not take down the render thread.
+            MorphDummies.Plan plan =
+                    MorphDummies.renderPlan(player, partialTick);
+            if (plan == null) {
+                return; // unmorphed (or unrenderable morph): vanilla player
+            }
             EntityRenderState primary =
                     MorphDummies.extractRaw(self, plan.primary(),
                             partialTick);

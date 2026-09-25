@@ -88,7 +88,7 @@ import java.util.Set;
  * <p><b>What is deliberately NOT here</b> (kept as identity, so the selector
  * still shows one entry per genuinely different-looking mob): every appearance
  * discriminator — {@code Color}, {@code Variant}/{@code variant},
- * {@code sound_variant}, {@code Sheared}/{@code sheared}, {@code Pumpkin},
+ * {@code Sheared}/{@code sheared}, {@code Pumpkin},
  * {@code powered}, {@code Size}/{@code size}, {@code Type}/{@code type},
  * {@code CollarColor}, {@code RabbitType}, {@code MainGene}/{@code HiddenGene},
  * the goat horn/scream flags, {@code VillagerData}, {@code IsBaby},
@@ -96,6 +96,12 @@ import java.util.Set;
  * {@code CustomName}/{@code CustomNameVisible}, so a name-tagged mob stays its
  * own morph (wave 5 item D; re-confirmed by the user 2026-07-29:
  * "endermites should only have one version other than if you nametag them").</p>
+ *
+ * <p>{@code sound_variant} used to be on that list and is not any more: it is
+ * the mob's VOICE, not its look, and 26.x rolls it at random for every chicken,
+ * cow, cat, pig and wolf it spawns, so identical-looking wolves became one
+ * morph per voice (user, 2026-09-24: "every time i kill a wolf i get a new
+ * morph, they are identical wolfs"). It is stripped per type below.</p>
  *
  * <p>No {@code net.fabricmc} imports — shared server + client. Recreation of
  * iChun's Morph; all credit for the original design to iChun.</p>
@@ -141,7 +147,7 @@ public final class MorphNbtStripper {
                 "TicksSincePollination", "CannotEnterHiveTicks",
                 "CropsGrownSincePollination");
         rule(Camel.class, "LastPoseTick");
-        rule(Chicken.class, "IsChickenJockey", "EggLayTime");
+        rule(Chicken.class, "IsChickenJockey", "EggLayTime", "sound_variant");
         rule(Dolphin.class, "GotFish", "Moistness");
         rule(Fox.class, "Trusted", "Sleeping", "Sitting", "Crouching");
         rule(GlowSquid.class, "DarkTicksRemaining");
@@ -155,6 +161,15 @@ public final class MorphNbtStripper {
         rule(net.minecraft.world.entity.animal.frog.Tadpole.class, "FromBucket");
         rule(net.minecraft.world.entity.animal.fish.Pufferfish.class,
                 "PuffState");
+
+        // --- voices -------------------------------------------------------
+        // A random voice per spawned mob, not a look (see the class comment).
+        // The chicken's is in its rule above; these five are every vanilla mob
+        // that saves one, on 26.2 and 26.3 alike.
+        rule(net.minecraft.world.entity.animal.cow.Cow.class, "sound_variant");
+        rule(net.minecraft.world.entity.animal.feline.Cat.class, "sound_variant");
+        rule(net.minecraft.world.entity.animal.pig.Pig.class, "sound_variant");
+        rule(net.minecraft.world.entity.animal.wolf.Wolf.class, "sound_variant");
 
         // --- equines -----------------------------------------------------
         // Temper is a fresh 0-99 roll per spawned horse — on its own that made
@@ -193,7 +208,9 @@ public final class MorphNbtStripper {
                 "CannotBeHunted");
         rule(AbstractPiglin.class, "IsImmuneToZombification", "TimeInOverworld");
         rule(Piglin.class, "CannotHunt");
-        rule(Skeleton.class, "StrayConversionTime");
+        // 26.3 also writes FreezingTime (-1 unless in powder snow) for every
+        // skeleton; harmless on 26.2, which never writes it.
+        rule(Skeleton.class, "StrayConversionTime", "FreezingTime");
         rule(Zombie.class, "CanBreakDoors", "InWaterTime",
                 "DrownedConversionTime");
         rule(ZombieVillager.class, "ConversionTime", "ConversionPlayer", "Xp",

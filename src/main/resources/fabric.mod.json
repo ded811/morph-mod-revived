@@ -3,10 +3,11 @@
 	"id": "deds_morph",
 	"version": "${version}",
 	"name": "Morph Mod Revived",
-	"description": "Kill a mob, become the mob. Every living creature you slay joins your collection of morphs, and your body twists into the new shape over a few seconds — bat, blaze, creeper, anything — while other players watch it happen. Open the selector to flip between your collected forms, or return to your own skin at any time. The iconic shapeshifting chaos of iChun's 1.6.4 Morph, rebuilt from scratch for Minecraft ${minecraft_version} on Fabric. Original mod by iChun; unofficial fan revival, all credit for the original design to iChun.",
+	"description": "Kill a mob, become the mob. The mobs you slay join your collection of morphs, and your body twists into the new shape over a few seconds — bat, blaze, creeper and more — while other players watch it happen. Open the selector to flip between your collected forms, or return to your own skin. The iconic shapeshifting chaos of iChun's 1.6.4 Morph, ported to Minecraft ${minecraft_version} on Fabric. Original mod by iChun; unofficial fan revival, all credit for the original design to iChun.",
 	"authors": ["Ded811"],
 	"contributors": ["iChun (original Morph author)"],
 	"license": "LGPL-3.0-only",
+	"icon": "assets/deds_morph/icon.png",
 	"environment": "*",
 	"entrypoints": {
 		"main": [

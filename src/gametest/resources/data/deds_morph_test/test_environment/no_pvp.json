@@ -1,0 +1,7 @@
+{
+  "_comment": "PvP off for the pet/golem gametests. Setting the pvp game rule from inside a test raced with the other tests of the same batch (one test's restore switched PvP back on mid-way through the next); an environment sets it for the batch and vanilla restores it afterwards.",
+  "type": "minecraft:game_rules",
+  "rules": {
+    "minecraft:pvp": false
+  }
+}

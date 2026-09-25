@@ -12,6 +12,7 @@
 		"InventoryScreenMixin",
 		"LivingEntityRendererInvoker",
 		"ModelPartAccessor",
+		"MouseHandlerSelectorMixin",
 		"PlayerEyeHeightMixin",
 		"SquidAccessor"
 	],

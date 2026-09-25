@@ -46,8 +46,8 @@ public final class MorphRenderPasses {
             double z, PoseStack poseStack, SubmitNodeCollector collector,
             float alpha) {
         if (!(state instanceof LivingEntityRenderState living)
-                || alpha <= 0.0f) {
-            return;
+                || alpha <= 0.0f || living.isInvisible) {
+            return; // an invisible player shows no morphskin either
         }
         if (!(dispatcher.getRenderer(state)
                 instanceof LivingEntityRenderer renderer)) {
@@ -93,7 +93,8 @@ public final class MorphRenderPasses {
             double y, double z, PoseStack poseStack,
             SubmitNodeCollector collector,
             MorphDummies.InterimPayload payload) {
-        if (!(state instanceof LivingEntityRenderState living)) {
+        if (!(state instanceof LivingEntityRenderState living)
+                || living.isInvisible) {
             return;
         }
         poseStack.pushPose();

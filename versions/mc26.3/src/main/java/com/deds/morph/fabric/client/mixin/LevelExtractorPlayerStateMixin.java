@@ -6,10 +6,11 @@ import net.minecraft.client.renderer.entity.state.EntityRenderState;
 import net.minecraft.client.renderer.extract.LevelExtractor;
 import net.minecraft.world.entity.Entity;
 
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
+
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Redirect;
 
 /**
  * 26.3 only (versions/mc26.3; registered in deds_morph.version.mixins.json).
@@ -31,18 +32,16 @@ import org.spongepowered.asm.mixin.injection.Redirect;
 @Mixin(LevelExtractor.class)
 public abstract class LevelExtractorPlayerStateMixin {
 
-    @Shadow
-    private EntityRenderState extractEntity(Entity entity, float partialTickTime) {
-        throw new AssertionError();
-    }
-
-    @Redirect(method = "extractPlayerState",
+    // WrapOperation, not Redirect: another mod wrapping the same call still works.
+    @WrapOperation(method = "extractPlayerState",
             at = @At(value = "INVOKE",
                     target = "Lnet/minecraft/client/renderer/extract/LevelExtractor;"
                             + "extractEntity(Lnet/minecraft/world/entity/Entity;F)"
                             + "Lnet/minecraft/client/renderer/entity/state/EntityRenderState;"))
     private EntityRenderState deds_morph$extractRealPlayerState(LevelExtractor self,
-            Entity entity, float partialTickTime) {
-        return MorphDummies.rawExtract(() -> this.extractEntity(entity, partialTickTime));
+            Entity entity, float partialTickTime,
+            Operation<EntityRenderState> original) {
+        return MorphDummies.rawExtract(
+                () -> original.call(self, entity, partialTickTime));
     }
 }

@@ -27,9 +27,9 @@ import net.minecraft.resources.Identifier;
  * <p>Wave 2 (selector GUI overhaul): the browse keys now ship BOUND to their
  * original defaults {@code [} / {@code ]} via the {@link ClientKeys} default-key
  * overload (still rebindable in the vanilla controls screen). The remaining
- * selector inputs (Enter/Esc/Delete/Backspace/grave + LMB/RMB + Shift) are
- * raw-polled in {@link MorphSelector#clientTick}, matching the original which
- * polled the keyboard/mouse directly. TODO(deds-api): lift — HUD overlay +
+ * selector inputs are rebindable keys too (Enter/Esc/Delete/grave); only
+ * LMB/RMB, Shift and the favourites wheel's grave are raw-polled, matching the
+ * original which polled the keyboard/mouse directly. Backspace is not bound. TODO(deds-api): lift — HUD overlay +
  * client-input surfaces are API v1.1 candidates.</p>
  */
 @Environment(EnvType.CLIENT)

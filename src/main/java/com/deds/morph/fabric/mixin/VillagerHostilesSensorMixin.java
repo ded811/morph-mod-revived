@@ -35,4 +35,25 @@ public abstract class VillagerHostilesSensorMixin {
             cir.setReturnValue(true);
         }
     }
+
+    /**
+     * The other half. Vanilla {@code isMatchingEntity} follows {@code isHostile}
+     * with {@code isClose}, which looks the fear distance up by the candidate's
+     * OWN type. For a player that is {@code minecraft:player}, which the table
+     * does not hold, and unboxing the missing value threw a NullPointerException
+     * in the villager's tick: a server crash for any zombie-shaped player within
+     * 16 blocks of a villager. A player is measured by the type it looks like.
+     */
+    @Inject(method = "isClose", at = @At("HEAD"), cancellable = true)
+    private void deds_morph$morphIsClose(LivingEntity body, LivingEntity mob,
+            CallbackInfoReturnable<Boolean> cir) {
+        if (!(mob instanceof Player player)) {
+            return;
+        }
+        EntityType<?> morphType = MorphView.morphType(player);
+        Float distance = morphType == null ? null
+                : VillagerHostilesSensorAccessor.deds_morph$hostiles().get(morphType);
+        cir.setReturnValue(distance != null
+                && mob.distanceToSqr(body) <= distance * distance);
+    }
 }

@@ -87,8 +87,11 @@ public final class MorphHands {
     }
 
     /** Assumed-arm data per entity type; empty = broken/non-living form. */
-    private static final Map<EntityType<?>, Optional<HandForm>> FORMS =
-            new HashMap<>();
+    /** Keyed by the dummy itself (one per worn variant, rebuilt on change):
+     *  keyed by type, the first cow's texture and whichever baby/adult model
+     *  rendered last were frozen for every cow for the whole session. */
+    private static final Map<LivingEntity, Optional<HandForm>> FORMS =
+            new java.util.WeakHashMap<>();
 
     private static final class HandCanvas {
         final List<ModelPart.Cube> cubes = new ArrayList<>();
@@ -313,7 +316,7 @@ public final class MorphHands {
         if (form instanceof AbstractClientPlayer playerDummy) {
             return playerForm(playerDummy); // NEVER via FORMS (§1.4 major fix)
         }
-        return FORMS.computeIfAbsent(form.getType(), type -> {
+        return FORMS.computeIfAbsent(form, key -> {
             try {
                 EntityRenderDispatcher dispatcher = Minecraft.getInstance()
                         .getEntityRenderDispatcher();
@@ -325,7 +328,7 @@ public final class MorphHands {
                     return Optional.empty();
                 }
                 Identifier texture = renderer.getTextureLocation(living);
-                Model<?> model = renderer.getModel();
+                Model<?> model = MorphModels.modelForState(renderer, living);
                 ModelPart arm = findAssumedArm(model.root());
                 if (arm == null) {
                     // Armless morph: no first-person hand, but keep the
@@ -339,7 +342,7 @@ public final class MorphHands {
                         MorphModels.maxBoxHeight(boxes)));
             } catch (Exception e) {
                 Deds.LOGGER.warn("[deds_morph] cannot resolve a morph arm"
-                        + " for {}", type, e);
+                        + " for {}", key.getType(), e);
                 return Optional.empty();
             }
         }).orElse(null);

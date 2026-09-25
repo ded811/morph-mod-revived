@@ -182,7 +182,7 @@ public final class MorphWave10GameTests implements CustomTestMethodInvoker {
     // ==================================================================
 
     /**
-     * {@code childMorphs} (default 0) refuses baby mobs
+     * {@code childMorphs} (default true since 2026-09-24; the original's was 0) refuses baby mobs when false
      * ({@code O:morph/common/core/EntityHelper.java:49} —
      * {@code Morph.childMorphs == 0 && living.isChild()}).
      *
@@ -230,6 +230,39 @@ public final class MorphWave10GameTests implements CustomTestMethodInvoker {
         } finally {
             Morph.CONFIG.set(original);
         }
+        helper.succeed();
+    }
+
+    /** "/morph whitelist steve" used to never match the player "Steve". */
+    @GameTest(maxTicks = 40)
+    public void whitelistMatchesNamesIgnoringCase(GameTestHelper helper) {
+        ServerPlayer player = mockPlayer(helper);
+        Cow cow = spawn(helper, EntityTypes.COW, 1, 1);
+        MorphConfig original = Morph.CONFIG.get();
+        try {
+            Morph.CONFIG.set(original.withWhitelistedPlayers(java.util.List.of(
+                    player.getScoreboardName().toUpperCase(java.util.Locale.ROOT))));
+            helper.assertTrue(Morph.acquireTarget(player, cow, false, true),
+                    "a whitelisted name must match its player ignoring case");
+        } finally {
+            Morph.CONFIG.set(original);
+        }
+        helper.succeed();
+    }
+
+    /** A hand-edited save with a malformed id ("pig") must fail that one
+     *  entry, which the tolerant list decoder then skips - BId.of threw out of
+     *  the codec and aborted the whole player's load. */
+    @GameTest(maxTicks = 20)
+    public void aMalformedSavedIdIsAnErrorNotACrash(GameTestHelper helper) {
+        var result = com.deds.morph.MorphVariant.CODEC.parse(
+                net.minecraft.nbt.NbtOps.INSTANCE, net.minecraft.nbt.StringTag.valueOf("pig"));
+        helper.assertTrue(result.isError(),
+                "decoding the id \"pig\" must be a DataResult error, got " + result);
+        var good = com.deds.morph.MorphVariant.CODEC.parse(
+                net.minecraft.nbt.NbtOps.INSTANCE,
+                net.minecraft.nbt.StringTag.valueOf("minecraft:pig"));
+        helper.assertTrue(good.isSuccess(), "\"minecraft:pig\" must still decode");
         helper.succeed();
     }
 

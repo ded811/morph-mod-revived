@@ -82,12 +82,17 @@ final class FabricConfig<C> implements ConfigHandle<C> {
                         .orElseGet(() -> {
                             logger.warn("config {} did not parse cleanly — "
                                     + "using defaults", path);
+                            backUp();
                             return defaults.get();
                         });
                 return;
             } catch (Exception e) {
                 logger.warn("failed to read config {} — using defaults",
                         path, e);
+                if (!backUp()) {
+                    this.value = defaults.get(); // keep the user's file untouched
+                    return;
+                }
             }
         }
         // Absent or unreadable: adopt defaults and materialize the file so the
@@ -95,6 +100,23 @@ final class FabricConfig<C> implements ConfigHandle<C> {
         C def = defaults.get();
         this.value = def;
         save(def);
+    }
+
+    /**
+     * Keeps a copy of a config file that failed to load, as {@code <name>.json.bak},
+     * before anything can overwrite it: the defaults written back (or a later
+     * command's save) would otherwise throw away every setting the user wrote.
+     */
+    private boolean backUp() {
+        try {
+            Path bak = path.resolveSibling(path.getFileName() + ".bak");
+            Files.copy(path, bak, StandardCopyOption.REPLACE_EXISTING);
+            logger.warn("kept the unreadable config as {}", bak);
+            return true;
+        } catch (IOException e) {
+            logger.warn("could not back up config {}", path, e);
+            return false;
+        }
     }
 
     private void save(C value) {

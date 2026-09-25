@@ -11,7 +11,7 @@ seconds — bat, blaze, creeper, anything — while other players watch it happe
 Open the selector to flip between your collected forms, or return to your own
 skin at any time. You inherit the shape's hitbox and its passive abilities:
 flight, wall-climbing, water breathing, fire immunity, sunburn. It works on
-any living entity, including modded mobs and other players.
+mobs from other mods too, and on other players.
 
 Not made by, endorsed by, or affiliated with iChun.
 
@@ -50,11 +50,16 @@ versions; `versions/README.md` explains how.
 
 ## Licence
 
-**LGPL-3.0.** The original is LGPL-3.0, so this port is too. The licence is
-two documents: [`LICENSE`](LICENSE) (the LGPL-3.0) and
-[`LICENSE.GPL`](LICENSE.GPL) (the GPL-3.0 it incorporates). See
-[`NOTICE`](NOTICE) for attribution, the statement of changes, the asset
-position, and where the MIT-licensed `deds-api/` boundary sits.
+**LGPL-3.0-only.** The original is LGPL-3.0, so this port is too. The
+bundled Ded's API contains none of the original's code, but its author has put
+it under the LGPL-3.0 as well. The licence is two documents:
+[`LICENSE`](LICENSE) (the LGPL-3.0) and [`LICENSE.GPL`](LICENSE.GPL) (the
+GPL-3.0 it incorporates). See [`NOTICE`](NOTICE) for attribution, the
+statement of changes, the asset position, and who holds the copyright in which
+part.
 
-If you redistribute a built jar, you must also make this source available,
-and keep `LICENSE`, `LICENSE.GPL` and `NOTICE` with it.
+If you redistribute a built jar, keep `LICENSE`, `LICENSE.GPL` and `NOTICE`
+with it and make the matching source available. A link to this repository
+does that for an unchanged jar; if you changed anything, say so with a date
+and publish your changed source. Shipping only Ded's API inside your own mod
+does not put your mod under the LGPL; see NOTICE section 6.

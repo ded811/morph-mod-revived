@@ -13,6 +13,8 @@ import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
 import net.fabricmc.fabric.api.client.gametest.v1.screenshot.TestScreenshotOptions;
 
+import com.mojang.blaze3d.platform.InputConstants;
+
 import net.minecraft.client.CameraType;
 import net.minecraft.client.gui.screens.worldselection.WorldCreationUiState;
 import net.minecraft.client.renderer.entity.state.EntityRenderState;
@@ -28,6 +30,7 @@ import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.Pose;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.player.ChatVisiblity;
@@ -279,6 +282,74 @@ public final class MorphRenderClientTest implements FabricClientGameTest {
             }
             context.runOnClient(client -> MorphSelector.cancelKey());
             context.waitTicks(3);
+
+            // ---------------------------------------------------------------
+            // 8. BABY morphs, on by default since 2026-09-24 (childMorphs
+            //    true). The original shipped them off "due to improper morph
+            //    transitions", so photograph a baby mid-change and after it:
+            //    a quadruped (cow) and a humanoid (zombie). morphInto uses the
+            //    shipped config, so it also fails if the default is off.
+            // ---------------------------------------------------------------
+            standBeside(singleplayer, context, EAST_BED);
+            look(context, 90.0f, 15.0f);
+            morphInto(context, EntityTypes.COW, true);
+            context.waitTicks(Morph.TRANSITION_TICKS / 2);
+            shot(context, "12_baby_cow_mid_change");
+            context.waitTicks(Morph.TRANSITION_TICKS / 2 + 25);
+            shot(context, "12b_baby_cow_after_change");
+            morphInto(context, EntityTypes.ZOMBIE, true);
+            context.waitTicks(Morph.TRANSITION_TICKS / 2);
+            shot(context, "13_baby_zombie_mid_change");
+            context.waitTicks(Morph.TRANSITION_TICKS / 2 + 25);
+            shot(context, "13b_baby_zombie_after_change");
+
+            // ---------------------------------------------------------------
+            // 9. Clicks with the selector open act on the selector ONLY. A
+            //    right-click used to close the strip AND use the held item.
+            //    Survival, so a thrown snowball is really used up; the control
+            //    click at the end proves the simulated clicks reach the game.
+            // ---------------------------------------------------------------
+            run(singleplayer, "gamemode survival @a");
+            run(singleplayer, "clear @a");
+            run(singleplayer, "give @a minecraft:snowball 16");
+            context.waitTicks(5);
+            context.runOnClient(client -> {
+                client.gui.setScreen(null);
+                MorphSelector.prev(); // opens the strip
+            });
+            context.waitTicks(15);
+            context.getInput().pressMouse(InputConstants.MOUSE_BUTTON_RIGHT);
+            context.waitTicks(5);
+            context.runOnClient(client -> {
+                if (MorphSelector.isOpen()) {
+                    throw new AssertionError("a right-click must close the selector");
+                }
+                int left = client.player.getMainHandItem().getCount();
+                if (left != 16) {
+                    throw new AssertionError("the right-click that closed the selector "
+                            + "must not also throw a snowball, but " + left + " are left");
+                }
+                MorphSelector.prev(); // open again for the left-click
+            });
+            context.waitTicks(15);
+            context.getInput().pressMouse(InputConstants.MOUSE_BUTTON_LEFT);
+            context.waitTicks(5);
+            context.runOnClient(client -> {
+                if (MorphSelector.isOpen()) {
+                    throw new AssertionError("a left-click must pick and close the selector");
+                }
+            });
+            // Control: with the selector closed, the same right-click throws.
+            context.getInput().pressMouse(InputConstants.MOUSE_BUTTON_RIGHT);
+            context.waitTicks(5);
+            context.runOnClient(client -> {
+                int left = client.player.getMainHandItem().getCount();
+                if (left != 15) {
+                    throw new AssertionError("control: a right-click with the selector "
+                            + "closed must throw one snowball (15 left), but " + left
+                            + " are left - the simulated clicks are not reaching the game");
+                }
+            });
         }
     }
 
@@ -594,18 +665,36 @@ public final class MorphRenderClientTest implements FabricClientGameTest {
     /** Spawns {@code type} beside the player and acquires+wears it. */
     private static void morphInto(ClientGameTestContext context,
             EntityType<? extends LivingEntity> type) {
+        morphInto(context, type, false);
+    }
+
+    /** As above, optionally as the BABY form - which needs {@code childMorphs}
+     *  on, as it is by default. */
+    private static void morphInto(ClientGameTestContext context,
+            EntityType<? extends LivingEntity> type, boolean baby) {
         onServer(context, (server, player) -> {
             ServerLevel level = player.level();
             Entity victim = type.create(level, EntitySpawnReason.COMMAND);
             if (!(victim instanceof LivingEntity living)) {
                 throw new AssertionError("could not build " + type);
             }
+            if (baby) {
+                if (!(living instanceof Mob mob)) {
+                    throw new AssertionError(type + " has no baby form");
+                }
+                mob.setBaby(true);
+                if (!mob.isBaby()) {
+                    throw new AssertionError(type + " would not become a baby");
+                }
+            }
             living.snapTo(player.getX() + 2.0, player.getY(),
                     player.getZ() + 2.0, 0.0f, 0.0f);
             level.addFreshEntity(living);
             Morph.clearTransitionLock(player);
             if (!Morph.acquireTarget(player, living, true, true)) {
-                throw new AssertionError("failed to morph into " + type);
+                throw new AssertionError("failed to morph into "
+                        + (baby ? "a baby " : "") + type
+                        + (baby ? " (childMorphs must default to true)" : ""));
             }
         });
     }

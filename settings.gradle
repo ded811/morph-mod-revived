@@ -11,7 +11,8 @@ pluginManagement {
 
 rootProject.name = 'morph-mod-revived'
 
-// Ded's API is vendored into this repository (see NOTICE section 3b and
-// PUBLISHING.md) so that a fresh clone builds with no external Maven setup.
-// It is MIT-licensed and independent of the LGPL-3.0 mod in `src/`.
+// Ded's API is vendored into this repository (see NOTICE section 3(b)) so
+// that a fresh clone builds with no external Maven setup.
+// Like the mod it is LGPL-3.0, but it is Ded811's own work, independent of
+// the mod in `src/`, and contains no code derived from Morph.
 include ':deds-api'

@@ -17,7 +17,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  * {@code EventHandler.onLivingSetAttackTarget}: when a hostile mob tries to
  * target a player morphed as a hostile mob, {@link MorphAbilities} decides
  * (per {@code hostileAbilityMode} 0–4 + {@code hostileAbilityDistanceCheck})
- * whether to cancel the retarget. Server-side only; a no-op when the mode is 0.
+ * whether to cancel the retarget. Server-side only. Mode 0 (the default) is ON
+ * here - every hostile mob ignores a hostile-shaped player - unlike the
+ * original, where 0 meant off; only {@code abilities=false} turns it off.
  */
 @Mixin(Mob.class)
 public abstract class MobSetTargetMixin {

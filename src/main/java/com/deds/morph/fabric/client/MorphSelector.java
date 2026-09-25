@@ -151,14 +151,21 @@ public final class MorphSelector {
 
     // --- raw-poll edge state (mouse only; keyboard actions are rebindable
     //     KeyMappings dispatched via ClientKeys — see MorphClient) ---
-    private static boolean lmbWas;
-    private static boolean rmbWas;
+    /** Mouse buttons whose press {@link #handleClick} swallowed; their release
+     *  is swallowed too, and only theirs. */
+    private static final java.util.Set<Integer> swallowedButtons = new java.util.HashSet<>();
 
     // --- entity preview cache (one LivingEntity per variant; null = name-only) ---
     private static final Map<MorphVariant, LivingEntity> PREVIEW = new HashMap<>();
     private static Level previewLevel;
 
     private MorphSelector() {
+    }
+
+    /** Drops the preview dummies (they hold the client world); on disconnect. */
+    public static void clearPreviews() {
+        PREVIEW.clear();
+        previewLevel = null;
     }
 
     private static Identifier gui(String name) {
@@ -242,6 +249,36 @@ public final class MorphSelector {
     // fires once per press (ClientKeys dispatches via consumeClick) and no-ops
     // unless the strip is open. LMB/RMB remain additional raw mouse triggers.
     // ------------------------------------------------------------------
+
+    /**
+     * A mouse button event, before the game handles it. While the strip is open
+     * and no screen is up, a left press picks the highlighted form, a right
+     * press closes the strip, and both are swallowed (returns true) - they used
+     * to also swing, break or use the held item. A release is swallowed only if
+     * its press was, so a button held from before the strip opened still gets
+     * its release and is never left stuck down.
+     */
+    public static boolean handleClick(int button, boolean pressed) {
+        if (!pressed) {
+            return swallowedButtons.remove(button);
+        }
+        Minecraft mc = Minecraft.getInstance();
+        if (!open || mc.player == null || mc.gui.screen() != null
+                || mc.gui.overlay() != null) {
+            return false;
+        }
+        if (button == InputConstants.MOUSE_BUTTON_LEFT) {
+            swallowedButtons.add(button);
+            selectKey();
+            return true;
+        }
+        if (button == InputConstants.MOUSE_BUTTON_RIGHT) {
+            swallowedButtons.add(button);
+            cancelKey();
+            return true;
+        }
+        return false;
+    }
 
     /** {@code Enter} default: wear the highlighted morph (or own form). */
     public static void selectKey() {
@@ -342,12 +379,14 @@ public final class MorphSelector {
             return new int[] {0, 0};
         }
         MorphVariant worn = state.current().get();
-        List<Object> keys = groupKeys(state);
+        java.util.LinkedHashMap<Object, List<MorphVariant>> groups = sortedGroups(state);
+        List<Object> keys = new ArrayList<>(groups.keySet());
         int row = keys.indexOf(worn.groupKey());
         if (row < 0) {
             return new int[] {0, 0};
         }
-        int col = state.variantsOfKey(worn.groupKey()).indexOf(worn);
+        // The sorted order, as the render and the keys use (mode 2 sorts rows).
+        int col = groups.get(worn.groupKey()).indexOf(worn);
         return new int[] {row + 1, Math.max(0, col)};
     }
 
@@ -421,23 +460,10 @@ public final class MorphSelector {
             abilityScroll++;
         }
 
-        // Mouse triggers only: LMB = select, RMB = cancel (additional to the
-        // rebindable keyboard KeyMappings). Enter/Esc/Delete/grave are now
-        // rebindable actions dispatched by ClientKeys (see MorphClient).
-        boolean lmb = mc.mouseHandler.isLeftPressed();
-        boolean rmb = mc.mouseHandler.isRightPressed();
-
-        if (open && usable) {
-            clampSelected(player);
-            if (edge(lmb, lmbWas)) {
-                confirm(player);
-            } else if (edge(rmb, rmbWas)) {
-                close();
-            }
-        }
-
-        lmbWas = lmb;
-        rmbWas = rmb;
+        // Mouse clicks (LMB = select, RMB = cancel) arrive through
+        // handleClick, from MouseHandlerSelectorMixin, so the game does not
+        // also act on them. Enter/Esc/Delete/grave are rebindable actions
+        // dispatched by ClientKeys (see MorphClient).
 
         if (selectorTimer > 0) {
             selectorTimer--;
@@ -460,11 +486,14 @@ public final class MorphSelector {
         if (variants.isEmpty()) {
             return Optional.empty();
         }
-        int idx = Math.floorMod(variantIndex, variants.size());
+        // Clamp, not wrap: after a Delete the index can sit one past the end,
+        // and wrapping silently targeted variant 0, which was not highlighted.
+        int idx = Math.max(0, Math.min(variantIndex, variants.size() - 1));
         return Optional.of(variants.get(idx));
     }
 
     private static void confirm(LocalPlayer player) {
+        clampSelected(player);
         MorphState state = Morph.STATE.get(player);
         Optional<MorphVariant> target = highlighted(state); // empty = own form
         // skip a no-op re-select of the morph already worn (original guard)
@@ -475,6 +504,7 @@ public final class MorphSelector {
     }
 
     private static void removeHighlighted(LocalPlayer player) {
+        clampSelected(player);
         MorphState state = Morph.STATE.get(player);
         Optional<MorphVariant> target = highlighted(state);
         if (target.isEmpty()) {
@@ -491,6 +521,7 @@ public final class MorphSelector {
     }
 
     private static void favouriteHighlighted(LocalPlayer player) {
+        clampSelected(player);
         MorphState state = Morph.STATE.get(player);
         highlighted(state).ifPresent(Morph.FAVOURITE::sendToServer);
     }
@@ -535,8 +566,16 @@ public final class MorphSelector {
         if (player == null || mc.gui.screen() != null) {
             return;
         }
+        // The collection can shrink under an open strip (a Delete, a sync):
+        // past the last row, Enter picked nothing - which demorphs.
+        clampSelected(player);
         MorphState state = Morph.STATE.get(player);
-        List<Object> keys = groupKeys(state);
+        // Rows are drawn from the SAME sorted map that Enter / Delete / the star
+        // read (selectedVariants): mode 2 also sorts the variants inside a row,
+        // and drawing them in collection order made those keys act on a variant
+        // other than the highlighted one - Delete could remove the wrong morph.
+        java.util.LinkedHashMap<Object, List<MorphVariant>> groups = sortedGroups(state);
+        List<Object> keys = new ArrayList<>(groups.keySet());
         Font font = mc.font;
         int rows = keys.size() + 1;
         int height = graphics.guiHeight();
@@ -576,11 +615,11 @@ public final class MorphSelector {
                         selected == 0);
             } else if (i == selected) {
                 renderSelectedGroup(graphics, font, state, mc, player,
-                        state.variantsOfKey(keys.get(i - 1)), slide, boxTop,
+                        groups.get(keys.get(i - 1)), slide, boxTop,
                         xTweenHori);
             } else {
                 renderCollapsedGroup(graphics, font, state, mc, player,
-                        state.variantsOfKey(keys.get(i - 1)), slide, boxTop);
+                        groups.get(keys.get(i - 1)), slide, boxTop);
             }
         }
     }
@@ -773,6 +812,12 @@ public final class MorphSelector {
      */
     private static List<Identifier> iconsFor(LivingEntity preview) {
         EnumSet<MorphAbility> abilities = MorphAbility.deriveAbilities(preview);
+        if (preview.isBaby()) {
+            // A baby morph never gets these two (MorphAbilities skips them, as
+            // the original did), so its box must not promise them.
+            abilities.remove(MorphAbility.STEP);
+            abilities.remove(MorphAbility.SUNBURN);
+        }
         List<Ability> custom = com.deds.morph.api.AbilityRegistry.resolve(preview);
         List<Identifier> icons = new ArrayList<>(abilities.size() + custom.size());
         for (MorphAbility ability : abilities) {

@@ -5,6 +5,7 @@ import com.deds.api.id.BId;
 import com.mojang.authlib.GameProfile;
 import com.mojang.datafixers.util.Either;
 import com.mojang.serialization.Codec;
+import com.mojang.serialization.DataResult;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 
 import io.netty.buffer.ByteBuf;
@@ -166,7 +167,18 @@ public record MorphVariant(BId type, CompoundTag data) {
     // TODO(deds-api): lift — BId <-> string (de)serialization currencies
     // belong in the API next to BId itself (API v1.1 candidate).
     static final Codec<BId> BID_CODEC =
-            Codec.STRING.xmap(BId::of, BId::toString);
+            Codec.STRING.comapFlatMap(MorphVariant::parseId, BId::toString);
+
+    /** A malformed id ("pig", ":pig") is a decode ERROR for that one entry, so
+     *  the lenient list decoder skips it; BId.of throwing used to abort the
+     *  whole player's load. */
+    private static DataResult<BId> parseId(String s) {
+        try {
+            return DataResult.success(BId.of(s));
+        } catch (IllegalArgumentException e) {
+            return DataResult.error(() -> "not a namespaced id: " + s);
+        }
+    }
 
     /** The verbose disk shape: {@code {type, data?}} (data omitted when empty). */
     private static final Codec<MorphVariant> OBJECT_CODEC =
@@ -184,12 +196,10 @@ public record MorphVariant(BId type, CompoundTag data) {
      * legacy-shaped); only variant-bearing entries write {@code {type,data}}.
      */
     public static final Codec<MorphVariant> CODEC =
-            Codec.either(Codec.STRING, OBJECT_CODEC).xmap(
-                    either -> either.map(
-                            s -> MorphVariant.ofType(BId.of(s)),
-                            variant -> variant),
+            Codec.either(BID_CODEC, OBJECT_CODEC).xmap(
+                    either -> either.map(MorphVariant::ofType, variant -> variant),
                     variant -> variant.isDefaultVariant()
-                            ? Either.left(variant.type().toString())
+                            ? Either.left(variant.type())
                             : Either.right(variant));
 
     // Wire: compact — bare id + optional NBT (absent when default). Both parts

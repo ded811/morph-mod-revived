@@ -165,7 +165,9 @@ public final class MorphAcquisitions {
 
             EntityRenderDispatcher dispatcher =
                     minecraft.getEntityRenderDispatcher();
-            EntityRenderState state = dispatcher.extractEntity(dummy, 1.0f);
+            // Raw: a killed player's dummy is an AbstractClientPlayer, and the
+            // normal path would run the morph swap under the victim's UUID.
+            EntityRenderState state = MorphDummies.extractRaw(dispatcher, dummy, 1.0f);
             if (!(dispatcher.getRenderer(dummy)
                             instanceof LivingEntityRenderer renderer)
                     || !(state instanceof LivingEntityRenderState living)) {

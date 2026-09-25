@@ -72,6 +72,26 @@ public final class MorphInteractionEffects {
         if (!(dummy instanceof Mob mob)) {
             return InteractionResult.PASS;
         }
+        if (mob instanceof net.minecraft.world.item.trading.Merchant) {
+            // A villager-shaped player is not a shop: the copy opened a trade
+            // screen with full stock every time.
+            return InteractionResult.PASS;
+        }
+        if (mob instanceof net.minecraft.world.entity.Bucketable) {
+            // A bucket on a sulfur-cube-shaped player filled a Sulfur Cube
+            // Bucket - a REAL mob, placeable, every cooldown: mob duplication
+            // out of the sandbox. Fish/axolotl/tadpole would do the same with
+            // a water bucket in productionItems.
+            return InteractionResult.PASS;
+        }
+        java.util.EnumSet<net.minecraft.world.entity.EquipmentSlot> emptySlots =
+                java.util.EnumSet.noneOf(net.minecraft.world.entity.EquipmentSlot.class);
+        for (net.minecraft.world.entity.EquipmentSlot slot
+                : net.minecraft.world.entity.EquipmentSlot.values()) {
+            if (mob.getItemBySlot(slot).isEmpty()) {
+                emptySlots.add(slot);
+            }
+        }
         // Place the dummy on the victim so sounds/drops land there.
         dummy.snapTo(victim.getX(), victim.getY(), victim.getZ(),
                 victim.getYRot(), 0.0f);
@@ -84,10 +104,38 @@ public final class MorphInteractionEffects {
         } finally {
             MorphSandbox.end();
         }
+        if (handBack(mob, emptySlots, player, level)) {
+            // The copy took the item (an allay does): it would vanish with the
+            // copy, so it went back to the player and nothing was harvested.
+            return InteractionResult.PASS;
+        }
         if (result.consumesAction()) {
             COOLDOWN.put(key, now);
             return result;
         }
         return InteractionResult.PASS;
+    }
+
+    /** Returns whatever the copy put into a slot that was empty (a hand, or a
+     *  sulfur cube's body) to the player; true if anything. */
+    private static boolean handBack(Mob mob,
+            java.util.Set<net.minecraft.world.entity.EquipmentSlot> emptySlots,
+            Player player, ServerLevel level) {
+        boolean any = false;
+        for (net.minecraft.world.entity.EquipmentSlot slot : emptySlots) {
+            ItemStack taken = mob.getItemBySlot(slot);
+            if (!taken.isEmpty()) {
+                ItemStack back = taken.copy();
+                mob.setItemSlot(slot, ItemStack.EMPTY);
+                // A creative player never lost the item: giving it back would
+                // duplicate it.
+                if (!player.getAbilities().instabuild
+                        && !player.getInventory().add(back)) {
+                    player.spawnAtLocation(level, back);
+                }
+                any = true;
+            }
+        }
+        return any;
     }
 }

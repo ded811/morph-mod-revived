@@ -31,6 +31,7 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.ai.goal.AvoidEntityGoal;
 import net.minecraft.world.entity.ai.goal.WrappedGoal;
+import net.minecraft.world.entity.ai.memory.MemoryModuleType;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.Vec3;
@@ -133,11 +134,39 @@ public final class MorphAiGameTests implements CustomTestMethodInvoker {
                             "the victim must be a committed sheep-morph");
                     wolf[0] = helper.spawn(EntityTypes.WOLF, new BlockPos(5, 2, 2));
                 })
-                .thenExecuteAfter(80, () -> helper.assertTrue(
+                // Wait for the hunt rather than sampling one tick: a wolf's target
+                // legitimately comes and goes mid-fight (knockback, sight), and the
+                // one-tick check at tick 87 failed now and then.
+                // wolfKeepsHuntingSheepMorph covers holding the target.
+                .thenWaitUntil(() -> helper.assertTrue(
                         wolf[0].getTarget() == victim,
                         "a wolf must hunt a sheep-morph (Animal + prey selector) but "
                                 + "target is " + wolf[0].getTarget()))
                 .thenSucceed();
+    }
+
+    /**
+     * ...and KEEPS hunting it: once the wolf has the sheep-morph, it must hold
+     * it for a full second. (Its prey goal re-tests the real player every tick;
+     * NonTameRandomTargetGoalMixin keeps that goal on the target. Without the
+     * hook the wolf's anger goal takes the player over instead, so this test
+     * guards the outcome, not the hook.)
+     */
+    @GameTest(maxTicks = 200)
+    public void wolfKeepsHuntingSheepMorph(GameTestHelper helper) {
+        floor(helper, 1, 6, 1, 3);
+        ServerPlayer victim = mockPlayer(helper);
+        hostileWorld(helper);
+        placeAt(victim, helper, 2.5, 2.0, 2.5);
+        seedMorph(victim, "sheep");
+        Mob wolf = helper.spawn(EntityTypes.WOLF, new BlockPos(5, 2, 2));
+        int[] held = new int[1];
+        helper.succeedWhen(() -> {
+            held[0] = wolf.getTarget() == victim ? held[0] + 1 : 0;
+            helper.assertTrue(held[0] >= 20,
+                    "a wolf must hold a sheep-morph target for 20 ticks in a row; "
+                            + "held " + held[0] + ", target " + wolf.getTarget());
+        });
     }
 
     // ==================================================================
@@ -290,6 +319,157 @@ public final class MorphAiGameTests implements CustomTestMethodInvoker {
                 avoidTargetOf(creeper) == catMorph,
                 "a creeper's cat-avoid goal must flee a cat-morph (bridge §A.3) "
                         + "— toAvoid was " + avoidTargetOf(creeper)));
+    }
+
+    // ==================================================================
+    // Crash guards: vanilla code that meets a morphed PLAYER where it
+    // expects the mob the player looks like.
+    // ==================================================================
+
+    /**
+     * A villager near a zombie-morph. The villager-fear bridge makes
+     * {@code VillagerHostilesSensor.isHostile(player)} true; vanilla then asks
+     * {@code isClose}, which looks the distance up by the entity's OWN type -
+     * {@code minecraft:player}, not in the table - and unboxed a null: a
+     * NullPointerException in the villager's tick, i.e. a server crash, for any
+     * zombie-shaped player within 16 blocks of a villager. The villager must
+     * instead record the player as its nearest hostile.
+     */
+    @GameTest(maxTicks = 120)
+    public void villagerFearsZombieMorphWithoutCrashing(GameTestHelper helper) {
+        floor(helper, 1, 6, 1, 3);
+        ServerPlayer zombieMorph = mockPlayer(helper);
+        placeAt(zombieMorph, helper, 2.5, 2.0, 2.5);
+        seedMorph(zombieMorph, "zombie");
+        Mob villager = helper.spawn(EntityTypes.VILLAGER, new BlockPos(5, 2, 2));
+        helper.succeedWhen(() -> helper.assertTrue(
+                villager.getBrain().getMemory(MemoryModuleType.NEAREST_HOSTILE)
+                        .orElse(null) == zombieMorph,
+                "a villager must record a zombie-morph as its nearest hostile - was "
+                        + villager.getBrain().getMemory(MemoryModuleType.NEAREST_HOSTILE)));
+    }
+
+    /**
+     * A fox near a wolf-morph. The fox's wolf-avoid goal tests
+     * {@code ((Wolf) entity).isTame()} on every candidate, and the AVOID bridge
+     * used to hand it the player: a ClassCastException, i.e. a server crash. The
+     * goal must now run without throwing.
+     */
+    @GameTest(maxTicks = 60)
+    public void foxNearWolfMorphDoesNotCrash(GameTestHelper helper) {
+        avoidGoalsSurvive(helper, "wolf", EntityTypes.FOX, false);
+    }
+
+    /** A spider near an armadillo-morph: the spider's armadillo-avoid goal
+     *  tests {@code ((Armadillo) entity).isScared()} - same failure as the fox. */
+    @GameTest(maxTicks = 60)
+    public void spiderNearArmadilloMorphDoesNotCrash(GameTestHelper helper) {
+        avoidGoalsSurvive(helper, "armadillo", EntityTypes.SPIDER, true);
+    }
+
+    /** Seeds {@code morphPath} on a player, puts {@code mobType} 3 blocks away,
+     *  and once the morph has committed runs every one of the mob's avoid goals'
+     *  {@code canUse()} directly - deterministic, where the goal selector would
+     *  only reach them on its own schedule - then lets the mob tick a while. */
+    private static void avoidGoalsSurvive(GameTestHelper helper, String morphPath,
+            net.minecraft.world.entity.EntityType<? extends Mob> mobType,
+            boolean hostileMob) {
+        floor(helper, 1, 6, 1, 3);
+        if (hostileMob) {
+            hostileWorld(helper); // a monster is removed at once in PEACEFUL
+        }
+        ServerPlayer morphed = mockPlayer(helper);
+        placeAt(morphed, helper, 2.5, 2.0, 2.5);
+        seedMorph(morphed, morphPath);
+        Mob[] mob = new Mob[1];
+        helper.startSequence()
+                .thenExecuteAfter(3, () -> {
+                    helper.assertTrue(MorphAbilities.committedVariant(morphed).isPresent(),
+                            "the " + morphPath + "-morph must have committed");
+                    mob[0] = helper.spawn(mobType, new BlockPos(5, 2, 2));
+                })
+                .thenExecuteAfter(2, () -> {
+                    for (WrappedGoal wrapped : ((MobGoalsAccessor) (Object) mob[0])
+                            .deds_morph$goalSelector().getAvailableGoals()) {
+                        if (wrapped.getGoal() instanceof AvoidEntityGoal<?> avoid) {
+                            avoid.canUse();
+                        }
+                    }
+                })
+                .thenExecuteAfter(40, () -> helper.assertTrue(mob[0].isAlive(),
+                        "the " + mobType + " must still be ticking next to a "
+                                + morphPath + "-morph"))
+                .thenSucceed();
+    }
+
+    // ==================================================================
+    // Someone's mob: pets and player-built golems obey PvP
+    // ==================================================================
+
+    /** Fails the test on any tick {@code mob} targets {@code victim}; succeeds
+     *  after {@code ticks} ticks otherwise. */
+    private static void neverTargets(GameTestHelper helper, Mob mob,
+            ServerPlayer victim, int ticks, String what) {
+        helper.onEachTick(() -> {
+            if (mob.getTarget() == victim) {
+                helper.fail(what);
+            }
+        });
+        helper.runAfterDelay(ticks, helper::succeed);
+    }
+
+    /** A player-built iron golem is someone's: with PvP off it must leave a
+     *  zombie-shaped player alone (a village golem still hunts one, see
+     *  {@link #golemHuntsZombie}). */
+    @GameTest(maxTicks = 120, environment = "deds_morph_test:no_pvp")
+    public void builtGolemSparesZombieMorphWithPvpOff(GameTestHelper helper) {
+        floor(helper, 1, 6, 1, 3);
+        ServerPlayer victim = mockPlayer(helper);
+        hostileWorld(helper);
+        placeAt(victim, helper, 2.5, 2.0, 2.5);
+        seedMorph(victim, "zombie");
+        helper.assertFalse(helper.getLevel().isPvpAllowed(), "precondition: the no_pvp environment is active");
+        net.minecraft.world.entity.animal.golem.IronGolem golem =
+                helper.spawn(EntityTypes.IRON_GOLEM, new BlockPos(5, 2, 2));
+        golem.setPlayerCreated(true);
+        neverTargets(helper, golem, victim, 90,
+                "a player-built golem must not hunt a zombie-morph with PvP off");
+    }
+
+    /** A pet wolf with PvP off must not hunt another player shaped as a
+     *  skeleton (wolves hunt skeletons). */
+    @GameTest(maxTicks = 120, environment = "deds_morph_test:no_pvp")
+    public void petWolfSparesSkeletonMorphWithPvpOff(GameTestHelper helper) {
+        floor(helper, 1, 6, 1, 3);
+        ServerPlayer victim = mockPlayer(helper);
+        ServerPlayer owner = mockPlayer(helper);
+        hostileWorld(helper);
+        placeAt(victim, helper, 2.5, 2.0, 2.5);
+        placeAt(owner, helper, 5.5, 2.0, 3.5);
+        seedMorph(victim, "skeleton");
+        helper.assertFalse(helper.getLevel().isPvpAllowed(), "precondition: the no_pvp environment is active");
+        net.minecraft.world.entity.animal.wolf.Wolf wolf =
+                helper.spawn(EntityTypes.WOLF, new BlockPos(5, 2, 2));
+        wolf.tame(owner);
+        neverTargets(helper, wolf, victim, 90,
+                "a pet wolf must not hunt a skeleton-morph with PvP off");
+    }
+
+    /** An invisible zombie-shaped player 4.5 blocks from a golem: vanilla would
+     *  not spot an invisible player that far off, so the hunt bridge must not
+     *  either (it used to skip vanilla's visibility and team checks). */
+    @GameTest(maxTicks = 120)
+    public void golemDoesNotSpotAnInvisibleZombieMorph(GameTestHelper helper) {
+        floor(helper, 1, 7, 1, 3);
+        ServerPlayer victim = mockPlayer(helper);
+        hostileWorld(helper);
+        placeAt(victim, helper, 1.5, 2.0, 2.5);
+        seedMorph(victim, "zombie");
+        victim.addEffect(new net.minecraft.world.effect.MobEffectInstance(
+                net.minecraft.world.effect.MobEffects.INVISIBILITY, 20 * 60, 0, false, false));
+        Mob golem = helper.spawn(EntityTypes.IRON_GOLEM, new BlockPos(6, 2, 2));
+        neverTargets(helper, golem, victim, 90,
+                "a golem must not hunt an invisible zombie-morph from 4.5 blocks");
     }
 
     /** The entity a mob's {@link AvoidEntityGoal} is currently set to flee, or null.

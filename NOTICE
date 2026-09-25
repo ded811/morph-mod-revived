@@ -1,6 +1,6 @@
 ================================================================================
 NOTICE — Morph Mod Revived
-Attribution, statement of changes, and the licence boundary inside this repo
+Attribution, statement of changes, and the licences inside this repo
 ================================================================================
 
 This project is an UNOFFICIAL fan revival. It is not made by, endorsed by, or
@@ -61,8 +61,9 @@ WHAT CHANGED, and WHEN:
   * July 2026 — the mod was rewritten for **Minecraft 26.2 on the Fabric mod
     loader**. The original targets Minecraft 1.6.4 on Minecraft Forge. No
     upstream source file survives verbatim: the original's Forge-era classes
-    (`morph.*`) have no counterpart in modern Minecraft, so every file in this
-    repository is newly written.
+    (`morph.*`) have no counterpart in modern Minecraft, so every source file
+    in this repository is newly written. The artwork and sounds are the
+    exception; see below and section 4.
 
   * September 2026 — the same sources also build for **Minecraft 26.3** on
     Fabric. A per-version build layer (`versions/`, see `versions/README.md`)
@@ -97,66 +98,96 @@ WHAT CHANGED, and WHEN:
     per-mob-class ability table is replaced by generic derivation from the
     entity's own properties, so modded mobs behave sensibly without a support
     file; the original API's reflection trampoline is not reproduced; the
-    `canSleepMorphed` default is flipped; and re-acquiring a morph you already
-    own deliberately does not refresh it in place. Behaviour, appearance and
-    configuration therefore do not match the original one-for-one. This is a
-    revival, not a faithful reproduction.
+    `canSleepMorphed` and `childMorphs` defaults are flipped (sleeping while
+    morphed and collecting baby mobs are on); the hostile-mob disguise is on by
+    default, where the original shipped it off; a mob's voice
+    (`sound_variant`) does not make it a separate morph; a new kill always
+    turns you into it (the original's `instaMorph` option is not reproduced);
+    and re-acquiring a morph you already own deliberately does not refresh it
+    in place. Behaviour, appearance and configuration therefore do not match
+    the original one-for-one. This is a revival, not a faithful reproduction.
+
+  * Some features are NEW WORK with no counterpart in the original: other
+    players riding, milking or shearing a morphed player, and mobs reacting to
+    the shape a player wears (fleeing it, hunting it, or villagers fearing
+    it).
 
   * Development of this port is ongoing; it has not reached a 1.0 release.
 
 
 --------------------------------------------------------------------------------
-3. LICENCE BOUNDARY INSIDE THIS REPOSITORY
+3. LICENCE AND COPYRIGHT INSIDE THIS REPOSITORY
 --------------------------------------------------------------------------------
 
-Two licences apply, to two clearly separated directories.
+Everything in this repository is licensed under the GNU Lesser General Public
+License, version 3 only (LGPL-3.0-only), with two exceptions that are kept
+exactly as they came: the two licence texts themselves, which belong to the
+Free Software Foundation, and the Gradle wrapper (`gradlew`, `gradlew.bat` and
+`gradle/wrapper/`), which is Gradle's own work under the Apache License 2.0,
+as its file headers say. For iChun's artwork and sounds, the LGPL-3.0 rests on
+the reading set out in section 4. What differs between the parts below is who
+holds the copyright, and whether iChun's work is in it.
 
-  (a) LGPL-3.0  —  `src/` (everything: the mod's Java, resources and assets)
+The LGPL-3.0 is written as a set of additional permissions on top of the GNU
+GPL version 3, so it is TWO documents and both ship here:
 
-      This is the derivative work described in section 2. It is licensed under
-      the GNU Lesser General Public License version 3, the same licence as the
-      original.
+    LICENSE      — GNU Lesser General Public License, Version 3
+                   (upstream calls this file `COPYING.LESSER`)
+    LICENSE.GPL  — GNU General Public License, Version 3
+                   (upstream calls this file `COPYING`)
 
-      The LGPL-3.0 is written as a set of additional permissions on top of the
-      GNU GPL version 3, so it is TWO documents and both ship here:
+Both are the Free Software Foundation's current texts. They are the same
+documents iChun ships, character for character, except that the FSF has since
+changed one URL in the copyright line from `http://fsf.org/` to
+`https://fsf.org/`.
 
-          LICENSE      — GNU Lesser General Public License, Version 3
-                         (upstream calls this file `COPYING.LESSER`)
-          LICENSE.GPL  — GNU General Public License, Version 3
-                         (upstream calls this file `COPYING`)
+  (a) The mod  —  `src/` (everything: the mod's Java, resources and assets),
+      and the per-version copies of its files under `versions/mc<version>/src/`
 
-      Both are the Free Software Foundation's current texts. They are the same
-      documents iChun ships, character for character, except that the FSF has
-      since changed one URL in the copyright line from `http://fsf.org/` to
-      `https://fsf.org/`.
+      This is the derivative work described in section 2, under the same
+      licence as the original.
 
       Copyright (C) 2013-2014 iChun     (the original work)
       Copyright (C) 2026 Ded811         (the modifications and the port)
 
       NOTE ON SCOPE: a handful of files under `src/` — the ~3-line Fabric
       loader entrypoints and the glue that calls into Ded's API — are original
-      work of this project and owe nothing to the upstream mod. They could in
-      principle be MIT. They are NOT carved out, deliberately: they are too
-      small and too entangled with the derived code to be worth splitting, and
-      placing the whole of `src/` under LGPL-3.0 is the safe reading. If you
-      want a permissively licensed version of that glue, take it from Ded's
-      API instead, where the reusable parts already live.
+      work of this project and owe nothing to the upstream mod. They are NOT
+      carved out, deliberately: they are too small and too entangled with the
+      derived code to be worth splitting, so the whole of `src/` is treated as
+      part of the derivative work. The reusable parts live in Ded's API
+      instead (b), which carries none of iChun's work.
 
-  (b) MIT  —  `deds-api/`
+  (b) Ded's API  —  `deds-api/`, and the per-version copies of its files under
+      `versions/mc<version>/deds-api/`
 
       Ded's API is an independent shared library written for this project. It
       contains no code derived from Morph and no code derived from iChunUtil.
-      It is licensed MIT; the text is in `LICENSE.MIT`.
+      It is licensed under the LGPL-3.0-only, the same two texts as above.
 
-      Copyright (c) 2026 Ded811
+      Copyright (C) 2026 Ded811
 
-      It is vendored into this repository so that the repository builds on its
-      own — see `README.md` and `PUBLISHING.md`. It is not part of the
-      derivative work, and combining it with the LGPL-3.0 module does not
-      place it under LGPL-3.0 (MIT is compatible in that direction).
+      It is vendored into this repository so that a fresh clone builds with
+      nothing else set up (see the comment at the top of `build.gradle`). It
+      is not part of the derivative work: using it, on its own or in another
+      mod, owes nothing to iChun. But it is copyleft in its own right:
+      whoever distributes Ded's API, changed or not, alone or inside another
+      mod, must pass on this notice and the two licence texts, and make the
+      API's source, including any changes, available under the LGPL-3.0 (or
+      the GPL-3.0). The mod it is bundled in keeps its own licence (LGPL-3.0
+      section 4); section 6 has the details.
 
-Anything not listed above — the Gradle build files, this NOTICE, `README.md`,
-`PUBLISHING.md`, `.gitignore` — is MIT, copyright (c) 2026 Ded811.
+      Ded's API was licensed MIT until 24 September 2026. Copies released
+      under MIT stay under MIT for anyone who has or gets one; this copy, and
+      any copy made from it, is LGPL-3.0-only.
+
+  (c) Everything else  —  the Gradle build scripts (`build.gradle`,
+      `settings.gradle`, `deds-api/build.gradle`, `gradle.properties`; not
+      the Gradle wrapper), the rest of `versions/`
+      (per-version properties, rename tables, `versions/README.md`), this
+      NOTICE, `README.md`, `CHANGELOG.md`, `.gitignore` and `.gitattributes`.
+
+      Copyright (C) 2026 Ded811
 
 
 --------------------------------------------------------------------------------
@@ -165,6 +196,13 @@ Anything not listed above — the Gradle build files, this NOTICE, `README.md`,
 
 This repository ships 17 PNG textures and 6 OGG sounds that are iChun's
 original artwork and original audio. They are reused unmodified.
+
+The one other image, the mod's icon (`src/main/resources/assets/deds_morph/icon.png`,
+and `docs/icon.png` / `docs/icon_no_background.png`), is NOT iChun's: it was
+made by Ded811 for this revival (2026). The grass block in its middle is
+Minecraft's own texture, copyright Mojang, used as mods customarily do; that
+part is not Ded811's to license and is not covered by the LGPL-3.0 grant in
+section 3. The rest of the icon is Ded811's work under the LGPL-3.0.
 
 WHAT WAS MEASURED (2026-07-30):
 
@@ -250,9 +288,20 @@ release page, a modpack, a link to a friend — you must:
   * make clear that your copy is modified, and give a date, if you modified
     it (GPL-3.0 section 5a);
   * make the Corresponding Source available to whoever you gave the jar to —
-    alongside the jar, from the same place, or by a written offer valid for
-    three years (GPL-3.0 section 6). Pointing at this repository is the easy
-    way to do this;
-  * not add restrictions of your own. Any extra term you try to impose on the
-    LGPL-3.0 parts is removable by whoever receives the work (GPL-3.0
-    section 7).
+    in the same download, or with a clear note next to the jar saying where to
+    get it (GPL-3.0 section 6d). For an unchanged jar, a link to this
+    repository at the matching release is enough (you stay responsible if
+    that link dies). If you changed anything, the source you point to must
+    include your changes;
+  * not add restrictions of your own. Any extra term you try to impose on this
+    work is removable by whoever receives it (GPL-3.0 section 7).
+
+Ded's API on its own (section 3(b)) is the same, minus the credit to iChun.
+If you ship it, changed or unchanged, by itself or nested inside your own mod:
+include the two licence texts and this notice; say in your own mod's
+description or README that it contains Ded's API, which is under the LGPL-3.0
+(LGPL-3.0 section 4a); and make the API's source, with any changes you made to
+it, available as above, under the LGPL-3.0 or the GPL-3.0. Only the API's
+source is owed, not your mod's: LGPL-3.0 section 4 lets you license your own
+code as you like, as long as your terms do not forbid changing the API copy
+inside it or reverse-engineering to debug such changes.

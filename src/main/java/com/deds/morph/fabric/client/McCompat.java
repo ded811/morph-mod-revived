@@ -60,6 +60,7 @@ public final class McCompat {
     public static void copySwing(LivingEntity to, LivingEntity from) {
         to.attackAnim = from.attackAnim;
         to.oAttackAnim = from.oAttackAnim;
+        to.swingingArm = from.swingingArm; // an off-hand swing swings the off arm
     }
 
     /** A render state that shows no attack swing. */

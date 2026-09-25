@@ -214,16 +214,24 @@ public final class MorphAbilities {
         if (last != player) {
             LAST_ENTITY.put(player.getUUID(), new WeakReference<>(player));
             if (last != null) {
+                killCustoms(applied.customs);
+                COMMITTED.remove(player.getUUID()); // killed: never kill them again
                 applied = NONE;
                 Morph.clearTransitionLock(player);
+                // A fish/squid morph that suffocated on land must not respawn
+                // already out of air (the counter is keyed by UUID).
+                LAND_AIR.remove(player.getUUID());
             }
         }
         // Belt-and-braces for the GC edge (old entity collected between logout and
         // rejoin, so LAST_ENTITY reads null): a COMMITTED entry whose weak owner no
         // longer matches still forces the full re-commit.
         if (applied != NONE && applied.owner.get() != player) {
+            killCustoms(applied.customs);
+            COMMITTED.remove(player.getUUID()); // killed: never kill them again
             applied = NONE;
             Morph.clearTransitionLock(player);
+            LAND_AIR.remove(player.getUUID());
         }
 
         // Commit a completed transition (never mid-morph — abilities apply at
@@ -293,6 +301,13 @@ public final class MorphAbilities {
                 apply(player, ability, profile);
             }
         }
+        // STEP's value belongs to the form, not the ability: camel (1.5) to
+        // horse (1.0), or adult to baby, kept the old height because STEP never
+        // left the set.
+        if (variantChanged && desired.contains(MorphAbility.STEP)
+                && applied.abilities.contains(MorphAbility.STEP)) {
+            apply(player, MorphAbility.STEP, profile);
+        }
 
         Committed committed = new Committed(desiredVariant, desired,
                 new WeakReference<>(player),
@@ -311,6 +326,8 @@ public final class MorphAbilities {
             if (player.isVehicle()) {
                 player.ejectPassengers();
             }
+            // ...and mobs hunting the OLD form let go of the player.
+            MorphView.releaseHunters(player);
             refreshBox(player);
         }
         return committed;
@@ -363,6 +380,18 @@ public final class MorphAbilities {
             }
         }
         return Map.copyOf(next);
+    }
+
+    /** Ends third-party instances whose player object is gone (death, relog,
+     *  End exit, server stop): the Ability contract promises kill() when an
+     *  instance leaves, and the old ones used to be dropped unkilled. */
+    private static void killCustoms(Map<BId, Ability.Instance> customs) {
+        for (Map.Entry<BId, Ability.Instance> entry : customs.entrySet()) {
+            guard(entry.getKey(), () -> {
+                entry.getValue().kill();
+                return null;
+            });
+        }
     }
 
     /** Ticks the third-party instances, each isolated from the server tick. */
@@ -449,6 +478,9 @@ public final class MorphAbilities {
      * {@link #IS_STRIDER}) are world-independent identity lookups and are kept.
      */
     public static void clearTransientState() {
+        for (Committed committed : COMMITTED.values()) {
+            killCustoms(committed.customs); // the Ability contract: kill() when it leaves
+        }
         COMMITTED.clear();
         LAND_AIR.clear();
         LAST_ENTITY.clear();
@@ -488,12 +520,14 @@ public final class MorphAbilities {
             MorphEntities.Profile profile) {
         switch (ability) {
             case STEP -> {
+                AttributeInstance attr = player.getAttribute(Attributes.STEP_HEIGHT);
+                if (attr != null) {
+                    attr.removeModifier(STEP_MODIFIER_ID); // before the baby check
+                }
                 if (profile == null || profile.baby()) {
                     return; // baby morphs skip step (original baby check)
                 }
-                AttributeInstance attr = player.getAttribute(Attributes.STEP_HEIGHT);
                 if (attr != null) {
-                    attr.removeModifier(STEP_MODIFIER_ID);
                     double base = player.getAttributeBaseValue(Attributes.STEP_HEIGHT);
                     attr.addTransientModifier(new AttributeModifier(STEP_MODIFIER_ID,
                             profile.stepHeight() - base,
@@ -543,7 +577,7 @@ public final class MorphAbilities {
                 // the client — that was the "wrong/inconsistent speed" bug). This
                 // server clamp remains only as a harmless backup for any
                 // server-authoritative motion (remote/headless/mock entities).
-                if (!player.getAbilities().flying) {
+                if (!player.getAbilities().flying && !player.isFallFlying()) {
                     Vec3 m = player.getDeltaMovement();
                     if (m.y < FLOAT_TERMINAL) {
                         player.setDeltaMovement(m.x, FLOAT_TERMINAL, m.z);
@@ -749,7 +783,7 @@ public final class MorphAbilities {
      * replacement for the original 1.6.4 biome-temperature check.
      */
     private static void snowGolemTrailTick(ServerPlayer player) {
-        if (!Morph.config().abilities()
+        if (!Morph.config().abilities() || player.isSpectator()
                 || !isMorphInstanceOf(player, SnowGolem.class, IS_SNOW_GOLEM)
                 || !(player.level() instanceof ServerLevel level)) {
             return;
@@ -833,7 +867,9 @@ public final class MorphAbilities {
             }
             case FLY -> {
                 Abilities abilities = player.getAbilities();
-                if (!abilities.instabuild) { // creative keeps flight
+                // Creative keeps flight, and so does a spectator: taking it made
+                // a spectator fall through the world and die in the void.
+                if (!abilities.instabuild && !player.isSpectator()) {
                     abilities.mayfly = false;
                     abilities.flying = false;
                     player.onUpdateAbilities();
@@ -904,8 +940,10 @@ public final class MorphAbilities {
 
     /**
      * Recomputes the player's AABB + eye-height field from the (now morph-)
-     * dimensions the {@code getDimensions} mixin returns, then nudges out of any
-     * block the resized box overlaps (Part B — snap the box at transition end).
+     * dimensions the {@code getDimensions} mixin returns (Part B — snap the box
+     * at transition end). NB: vanilla does NOT nudge a player out of blocks here
+     * (fudgePositionAfterSizeChange is skipped for players), so a tall form taken
+     * under a low ceiling can suffocate until the player moves.
      */
     private static void refreshBox(ServerPlayer player) {
         player.refreshDimensions();

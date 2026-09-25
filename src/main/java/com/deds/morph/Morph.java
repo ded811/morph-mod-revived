@@ -113,8 +113,8 @@ public final class Morph implements DedsMod {
     public static MessageType<Optional<MorphVariant>> SELECT;
 
     /**
-     * C2S {@code deds_morph:remove}: the selector's remove key (Delete /
-     * Backspace) asks the server to drop an acquired morph variant. Delegates to
+     * C2S {@code deds_morph:remove}: the selector's remove key (Delete by
+     * default) asks the server to drop an acquired morph variant. Delegates to
      * {@link #removeMorph} which enforces every guard (never the worn morph,
      * never mid-transition). A dropped variant also leaves {@code favourites}.
      */
@@ -187,6 +187,7 @@ public final class Morph implements DedsMod {
             "FallFlying", "active_effects", "last_hurt_by_mob",
             "last_hurt_by_player", "last_hurt_by_player_memory_time",
             "ticks_since_last_hurt_by_mob", "sleeping_pos",
+            "invulnerable_time",  // 26.3: written while a spawn/convert grace lasts
             "locator_bar_icon",   // per-instance waypoint marker, never a variant
             "attributes",   // transient health-derived max + per-instance modifiers
             // Mob
@@ -207,6 +208,18 @@ public final class Morph implements DedsMod {
      * on {@link MorphState} — that record is a wave-1 binding contract with a
      * fixed disk/wire shape and must not be widened for this.
      */
+    /** Server tick of each player's last favourite packet (throttle). */
+    private static final Map<UUID, Integer> lastFavouriteTick =
+            new java.util.concurrent.ConcurrentHashMap<>();
+
+    /**
+     * The most morphs one player can own. The whole collection is synced to its
+     * owner, and past Fabric's attachment sync limit (about 1 MiB) the owner was
+     * disconnected on every login - reachable in modded packs whose mobs save a
+     * per-individual value, making every kill a new morph.
+     */
+    public static final int MAX_MORPHS = 1000;
+
     private static final Map<UUID, Integer> transitionEnd =
             new ConcurrentHashMap<>();
 
@@ -246,7 +259,16 @@ public final class Morph implements DedsMod {
 
         FAVOURITE = ctx.net().registerC2S("favourite",
                 MorphVariant.STREAM_CODEC,
-                (variant, sender) -> toggleFavourite(sender, variant));
+                (variant, sender) -> {
+                    // Each toggle re-sends the owner's whole list; a client
+                    // spamming the packet made the server encode it every time.
+                    int now = sender.level().getServer().getTickCount();
+                    Integer last = lastFavouriteTick.put(sender.getUUID(), now);
+                    if (last != null && now - last < 2) {
+                        return;
+                    }
+                    toggleFavourite(sender, variant);
+                });
 
         ACQUIRE_FX = ctx.net().registerS2C("acquire_fx",
                 AcquireFx.STREAM_CODEC);
@@ -372,8 +394,8 @@ public final class Morph implements DedsMod {
             return false; // armor stands and other non-Mob living excluded
         }
         List<String> whitelist = config().whitelistedPlayers();
-        if (!whitelist.isEmpty()
-                && !whitelist.contains(killer.getScoreboardName())) {
+        if (!whitelist.isEmpty() && whitelist.stream().noneMatch(
+                name -> name.equalsIgnoreCase(killer.getScoreboardName()))) {
             return false; // skill whitelist gate (0.4.0): only listed players
         }
         // Resolve the EFFECTIVE variant FIRST, then gate on it (wave 5 item C):
@@ -439,6 +461,9 @@ public final class Morph implements DedsMod {
                 : state.owns(variant);
         if (already) {
             return false; // no-duplicate append
+        }
+        if (state.acquired().size() >= MAX_MORPHS) {
+            return false; // full: see MAX_MORPHS
         }
         STATE.set(killer, state.acquireAndMorph(variant));
         beginTransition(killer);
@@ -611,8 +636,8 @@ public final class Morph implements DedsMod {
             return false;
         }
         MorphConfig cfg = CONFIG.get();
-        if (cfg.whitelistedPlayers().contains(name)) {
-            return false;
+        if (cfg.whitelistedPlayers().stream().anyMatch(name::equalsIgnoreCase)) {
+            return false; // names are matched ignoring case
         }
         List<String> next = new ArrayList<>(cfg.whitelistedPlayers());
         next.add(name);
@@ -629,11 +654,11 @@ public final class Morph implements DedsMod {
             return false;
         }
         MorphConfig cfg = CONFIG.get();
-        if (!cfg.whitelistedPlayers().contains(name)) {
+        if (cfg.whitelistedPlayers().stream().noneMatch(name::equalsIgnoreCase)) {
             return false;
         }
         List<String> next = new ArrayList<>(cfg.whitelistedPlayers());
-        next.remove(name);
+        next.removeIf(name::equalsIgnoreCase);
         CONFIG.set(cfg.withWhitelistedPlayers(next));
         return true;
     }
@@ -717,7 +742,9 @@ public final class Morph implements DedsMod {
      */
     public static void resetServerState() {
         transitionEnd.clear();
+        lastFavouriteTick.clear();
         MorphAbilities.clearTransientState();
+        MorphView.clearCaches();
     }
 
     // ------------------------------------------------------------------

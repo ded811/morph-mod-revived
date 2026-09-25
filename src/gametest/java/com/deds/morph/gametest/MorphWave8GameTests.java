@@ -377,8 +377,13 @@ public final class MorphWave8GameTests implements CustomTestMethodInvoker {
             "ConversionTime", "TimeInOverworld", "DespawnDelay",
             "SkeletonTrapTime", "LastRestock", "LastGossipDecay", "Fuse", "fuse",
             "anger_end_time", "AngerTime", "InLove",
-            // spawn-time random rolls
+            // spawn-time random rolls (sound_variant: a random voice per
+            // chicken/cow/cat/pig/wolf, which made identical wolves separate
+            // morphs)
             "Temper", "Strength", "ExplosionRadius", "ExplosionPower",
+            "sound_variant",
+            // 26.3: every skeleton's freezing timer, and a spawn/convert grace
+            "FreezingTime", "invulnerable_time",
             // world positions the individual happens to remember
             "hive_pos", "flower_pos", "anchor_pos", "bound_pos",
             "patrol_target", "wander_target", "carriedBlockState",
@@ -459,7 +464,6 @@ public final class MorphWave8GameTests implements CustomTestMethodInvoker {
                 new Case(EntityTypes.RABBIT, "RabbitType"),
                 new Case(EntityTypes.MOOSHROOM, "Type"),
                 new Case(EntityTypes.COPPER_GOLEM, "weather_state"),
-                new Case(EntityTypes.PIG, "sound_variant"),
                 new Case(EntityTypes.PHANTOM, "size"),
                 new Case(EntityTypes.BOGGED, "sheared"),
                 new Case(EntityTypes.SALMON, "type"));

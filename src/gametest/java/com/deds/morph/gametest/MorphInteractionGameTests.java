@@ -425,6 +425,143 @@ public final class MorphInteractionGameTests implements CustomTestMethodInvoker 
                 .thenSucceed();
     }
 
+    // ==================================================================
+    // The sandboxed copy must not keep, sell or seat anything
+    // ==================================================================
+
+    private static int count(ServerPlayer player, net.minecraft.world.item.Item item) {
+        int n = 0;
+        for (int i = 0; i < player.getInventory().getContainerSize(); i++) {
+            ItemStack stack = player.getInventory().getItem(i);
+            if (stack.is(item)) {
+                n += stack.getCount();
+            }
+        }
+        return n;
+    }
+
+    /** An allay takes whatever it is handed; the copy would have kept it. */
+    @GameTest(maxTicks = 20)
+    public void allayCopyKeepsNoItem(GameTestHelper helper) {
+        ServerPlayer victim = mockPlayer(helper);
+        ServerPlayer interactor = mockPlayer(helper);
+        runProduction(victim, interactor, "allay",
+                net.minecraft.world.item.Items.BUCKET);
+        int buckets = count(interactor, net.minecraft.world.item.Items.BUCKET);
+        helper.assertTrue(buckets == 1,
+                "the bucket must come back from an allay-morph's copy, but the "
+                        + "interactor has " + buckets);
+        helper.succeed();
+    }
+
+    /** A SURVIVAL mock (the helper's mock is stamped creative, where nothing is
+     *  consumed), built the vanilla way: real Connection on an EmbeddedChannel. */
+    private static ServerPlayer survivalPlayer(GameTestHelper helper) {
+        net.minecraft.server.level.ServerLevel level = helper.getLevel();
+        net.minecraft.server.MinecraftServer server = level.getServer();
+        com.mojang.authlib.GameProfile profile = new com.mojang.authlib.GameProfile(
+                java.util.UUID.randomUUID(), "test-survival-player");
+        net.minecraft.server.network.CommonListenerCookie cookie =
+                net.minecraft.server.network.CommonListenerCookie.createInitial(profile, false);
+        ServerPlayer player = new ServerPlayer(server, level, profile,
+                net.minecraft.server.level.ClientInformation.createDefault()) {
+            @Override
+            public net.minecraft.world.level.GameType gameMode() {
+                return net.minecraft.world.level.GameType.SURVIVAL;
+            }
+        };
+        net.minecraft.network.Connection connection = new net.minecraft.network.Connection(
+                net.minecraft.network.protocol.PacketFlow.SERVERBOUND);
+        new io.netty.channel.embedded.EmbeddedChannel(
+                new io.netty.channel.ChannelHandler[] {connection});
+        server.getPlayerList().placeNewPlayer(connection, player, cookie);
+        helper.runBeforeTestEnd(() -> server.getPlayerList().remove(player));
+        player.getAbilities().instabuild = false;
+        return player;
+    }
+
+    /** The same in survival, where the allay really takes the bucket: it must
+     *  come back, exactly once. */
+    @GameTest(maxTicks = 20)
+    public void allayCopyReturnsTheItemInSurvival(GameTestHelper helper) {
+        ServerPlayer victim = mockPlayer(helper);
+        ServerPlayer interactor = survivalPlayer(helper);
+        InteractionResult result = runProduction(victim, interactor, "allay",
+                net.minecraft.world.item.Items.BUCKET);
+        int buckets = count(interactor, net.minecraft.world.item.Items.BUCKET);
+        helper.assertTrue(buckets == 1,
+                "a survival player must get the bucket back from an allay-morph's "
+                        + "copy, exactly once - has " + buckets + " (result " + result + ")");
+        helper.succeed();
+    }
+
+    /** A bucket on a sulfur-cube-shaped player filled a Sulfur Cube Bucket: a
+     *  real, placeable mob minted from a player, every cooldown. */
+    @GameTest(maxTicks = 20)
+    public void sulfurCubeCopyCannotBeBucketed(GameTestHelper helper) {
+        ServerPlayer victim = mockPlayer(helper);
+        ServerPlayer interactor = mockPlayer(helper);
+        InteractionResult result = runProduction(victim, interactor, "sulfur_cube",
+                net.minecraft.world.item.Items.BUCKET);
+        helper.assertTrue(result == InteractionResult.PASS,
+                "a sulfur-cube-morph must not be bucketed - " + result);
+        helper.assertTrue(interactor.getMainHandItem().is(net.minecraft.world.item.Items.BUCKET),
+                "the interactor must still hold an empty bucket, not " + interactor.getMainHandItem());
+        helper.succeed();
+    }
+
+    /** A villager-shaped player is not a shop: no trade screen, no use. */
+    @GameTest(maxTicks = 20)
+    public void villagerCopyIsNoShop(GameTestHelper helper) {
+        ServerPlayer victim = mockPlayer(helper);
+        ServerPlayer interactor = mockPlayer(helper);
+        InteractionResult result = runProduction(victim, interactor, "villager",
+                net.minecraft.world.item.Items.BUCKET);
+        helper.assertTrue(result == InteractionResult.PASS,
+                "a villager-morph must not be interacted with through its copy - "
+                        + result);
+        helper.assertTrue(interactor.containerMenu == interactor.inventoryMenu,
+                "no trade screen may open on a villager-morph");
+        helper.succeed();
+    }
+
+    /** A camel's right-click seats the player - on the copy, which is not in
+     *  the world. Nothing may be mounted during a sandboxed interaction. */
+    @GameTest(maxTicks = 20)
+    public void camelCopySeatsNobody(GameTestHelper helper) {
+        ServerPlayer victim = mockPlayer(helper);
+        ServerPlayer interactor = mockPlayer(helper);
+        runProduction(victim, interactor, "camel",
+                net.minecraft.world.item.Items.BUCKET);
+        helper.assertFalse(interactor.isPassenger(),
+                "the interactor must not end up riding a camel-morph's copy (vehicle "
+                        + interactor.getVehicle() + ")");
+        helper.succeed();
+    }
+
+    /** A rider leaving the server used to take its "mount" with it - here the
+     *  morphed player, who vanished from the world until they relogged. */
+    @GameTest(maxTicks = 160)
+    public void riderLeavingKeepsTheMorphedPlayer(GameTestHelper helper) {
+        ServerPlayer victim = mockPlayer(helper);
+        ServerPlayer rider = helper.makeMockServerPlayerInLevel(); // removed below
+        MorphVariant horse = variant("horse");
+        Morph.STATE.set(victim, new MorphState(java.util.Optional.of(horse),
+                java.util.List.of(horse)));
+        helper.startSequence()
+                .thenExecuteAfter(settle(), () -> {
+                    helper.assertTrue(MorphRideable.mount(rider, victim).consumesAction(),
+                            "the rider must mount the horse-morph");
+                    helper.getLevel().getServer().getPlayerList().remove(rider);
+                    helper.assertFalse(victim.isRemoved(),
+                            "the morphed player must stay in the world when its rider "
+                                    + "leaves (removal " + victim.getRemovalReason() + ")");
+                    helper.assertFalse(victim.isVehicle(),
+                            "the leaving rider must have got off");
+                })
+                .thenSucceed();
+    }
+
     @Override
     public void invokeTestMethod(GameTestHelper context, Method method)
             throws ReflectiveOperationException {

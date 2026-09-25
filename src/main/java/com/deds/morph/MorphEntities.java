@@ -213,6 +213,20 @@ public final class MorphEntities {
         if (dummy == null) {
             return Profile.BROKEN;
         }
+        try {
+            return probeProfile(variant, level, dummy);
+        } catch (RuntimeException broken) {
+            // A modded mob whose attributes / attachments / navigation throw on
+            // a never-ticked copy would otherwise throw from getDimensions on
+            // every tick of every player wearing it, server and client alike.
+            Deds.LOGGER.warn("[deds_morph] could not read {} as a morph; it will "
+                    + "behave as unbuildable", variant, broken);
+            return Profile.BROKEN;
+        }
+    }
+
+    private static Profile probeProfile(MorphVariant variant, Level level,
+            LivingEntity dummy) {
         EnumSet<MorphAbility> abilities = MorphAbility.deriveAbilities(dummy);
         // Variant-aware box: the loaded dummy's real bb (slime size, baby scale)
         // scaled with the dummy's eye height — the exact source the original's

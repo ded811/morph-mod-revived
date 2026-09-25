@@ -27,9 +27,12 @@ import java.util.List;
  * the selector's icon pass client-side. Modes are documented on
  * {@link MorphSort}.</p>
  *
+ * <p><b>{@code childMorphs} defaults to TRUE here and the original's default
+ * is 0</b> (the original disabled it "due to improper morph transitions"). The
+ * user asked for baby morphs on by default on 2026-09-24.</p>
+ *
  * <p><b>{@code canSleepMorphed} defaults to TRUE here and the original's
- * default is 0 — deviation D10-3, the one intentional default divergence in
- * this record.</b> The user asked for sleeping while morphed to work and signed
+ * default is 0 — deviation D10-3.</b> The user asked for sleeping while morphed to work and signed
  * off the wave-8 lie-down; wiring the option with the original's default would
  * have un-shipped an approved feature in the same change that made the option
  * real. Set it to {@code false} for the original behaviour, refusal string
@@ -171,7 +174,7 @@ public record MorphConfig(
     /** The 0.7.1 shipped defaults. */
     public static MorphConfig defaults() {
         return new MorphConfig(
-                false,          // childMorphs = 0
+                true,           // childMorphs — original 0, on by user request
                 true,           // playerMorphs = 1
                 false,          // bossMorphs = 0
                 List.of(),      // blacklistedMobs = ""
@@ -180,7 +183,7 @@ public record MorphConfig(
                 0,              // loseMorphsOnDeath = 0 (keep all)
                 true,           // instaMorph = 1
                 true,           // abilities = 1
-                0,              // hostileAbilityMode = 0 (off)
+                0,              // hostileAbilityMode 0 = ON (all hostiles ignore a hostile morph); the original's 0 was off
                 6,              // hostileAbilityDistanceCheck = 6
                 true,           // canSleepMorphed — DEVIATION D10-3, see below
                 true,           // allowMorphSelection = 1
@@ -191,7 +194,7 @@ public record MorphConfig(
 
     public static final Codec<MorphConfig> CODEC =
             RecordCodecBuilder.create(instance -> instance.group(
-                    Codec.BOOL.optionalFieldOf("childMorphs", false)
+                    Codec.BOOL.optionalFieldOf("childMorphs", true)
                             .forGetter(MorphConfig::childMorphs),
                     Codec.BOOL.optionalFieldOf("playerMorphs", true)
                             .forGetter(MorphConfig::playerMorphs),

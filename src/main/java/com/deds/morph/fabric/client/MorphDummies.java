@@ -249,6 +249,10 @@ public final class MorphDummies {
             FIRST_SEEN.clear();
             TRANSITIONS.clear();
             LAST_INSTANCE.clear();
+            BROKEN.clear(); // a failure on one server is not one on the next
+            // The selector's and wheel's preview dummies hold the old world too.
+            MorphSelector.clearPreviews();
+            MorphRadial.clearPreviews();
             // sortMorphs mode 3 is "most recently used SINCE CONNECTING to the
             // server" (O:morph/common/Morph.java:188) — leaving a world ends it.
             MorphSort.forgetRecent();
@@ -910,6 +914,9 @@ public final class MorphDummies {
      * {@link MorphAbilities}' client resolver by {@code MorphClient}.
      */
     public static Optional<MorphVariant> committedVariant(Player player) {
+        if (player instanceof MorphPlayerDummy) {
+            return Optional.empty(); // shares its target's UUID, never its morph
+        }
         UUID id = player.getUUID();
         Transition transition = TRANSITIONS.get(id);
         if (transition != null) {
@@ -1032,7 +1039,13 @@ public final class MorphDummies {
         // items (Minecraft skips any slot a mob's model can't show — acceptable
         // per the user).
         for (EquipmentSlot slot : EquipmentSlot.values()) {
-            dummy.setItemSlot(slot, player.getItemBySlot(slot));
+            // Hands and armour only: a player's saddle and body slots are always
+            // empty, and copying them wiped a saddled pig's or an armoured
+            // horse's own gear (part of the morph) every frame.
+            if (slot.getType() == EquipmentSlot.Type.HAND
+                    || slot.getType() == EquipmentSlot.Type.HUMANOID_ARMOR) {
+                dummy.setItemSlot(slot, player.getItemBySlot(slot));
+            }
         }
         // Enderman renders a CARRIED BLOCK from getCarriedBlock() (not a hand-item
         // layer), so mirror the player's main-hand BLOCK into it; a non-block held
@@ -1078,6 +1091,11 @@ public final class MorphDummies {
         // Unconditional, so it self-heals to false on landing.
         ((EntitySharedFlagsInvoker) dummy)
                 .deds_morph$setSharedFlag(FALL_FLYING_FLAG, player.isFallFlying());
+        // Invisible (5) and glowing (6): the renderer reads both off the dummy,
+        // so an invisible morphed player was fully visible to everyone and a
+        // glowing one had no outline.
+        ((EntitySharedFlagsInvoker) dummy).deds_morph$setSharedFlag(5, player.isInvisible());
+        ((EntitySharedFlagsInvoker) dummy).deds_morph$setSharedFlag(6, player.isCurrentlyGlowing());
         // RED DAMAGE FLASH + DEATH ANIMATION (playtest bugs 2 & 3). Verified in
         // LivingEntityRenderer.extractRenderState:
         //   state.hasRedOverlay = (entity.hurtTime > 0 || entity.deathTime > 0)

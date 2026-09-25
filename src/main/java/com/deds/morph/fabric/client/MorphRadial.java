@@ -86,6 +86,12 @@ public final class MorphRadial {
     private static final Map<MorphVariant, LivingEntity> PREVIEW = new HashMap<>();
     private static Level previewLevel;
 
+    /** Drops the preview dummies (they hold the client world); on disconnect. */
+    public static void clearPreviews() {
+        PREVIEW.clear();
+        previewLevel = null;
+    }
+
     private MorphRadial() {
     }
 

@@ -4,14 +4,17 @@ import java.util.regex.Pattern
 // Standalone build for "Morph Mod Revived".
 //
 // Two projects:
-//   :          (this one)  the mod itself   - LGPL-3.0, sources in src/
-//   :deds-api               Ded's API       - MIT,       sources in deds-api/
+//   :          (this one)  the mod itself   - sources in src/
+//   :deds-api               Ded's API       - sources in deds-api/
+//
+// Both are LGPL-3.0-only. The mod is derived from iChun's Morph; Ded's API
+// is Ded811's own work with no code from Morph.
 //
 // Ded's API is vendored rather than pulled from a Maven repository so that a
 // fresh clone of this repository builds with nothing else set up. That also
 // makes this repository the "Corresponding Source" that GPL-3.0 section 6 -
 // incorporated by LGPL-3.0 - requires of anyone distributing a built jar.
-// See NOTICE section 3.
+// See NOTICE sections 3(b) and 6.
 
 plugins {
 	id 'net.fabricmc.fabric-loom' version "${loom_version}" apply false
@@ -190,13 +193,13 @@ allprojects {
 // GPL-3.0 sections 4-6, incorporated by LGPL-3.0: every recipient must get a
 // copy of the licence and the notices must stay intact. Put both halves of
 // the LGPL-3.0 - and the attribution/statement-of-changes NOTICE - inside
-// every jar, so a player who only ever sees the jar still receives them.
+// every jar, sources jars included, so a player who only ever sees the jar
+// still receives them.
 allprojects {
-	tasks.named('jar') {
+	tasks.matching { it.name == 'jar' || it.name == 'sourcesJar' }.configureEach {
 		from(rootProject.rootDir) {
 			include 'LICENSE'
 			include 'LICENSE.GPL'
-			include 'LICENSE.MIT'
 			include 'NOTICE'
 		}
 	}
@@ -209,7 +212,7 @@ base {
 dependencies {
 	implementation project(':deds-api')
 	// Nest Ded's API inside the mod jar so players only download one file.
-	// MIT-licensed and separately identified - see NOTICE section 3.
+	// Separately identified in NOTICE section 3.
 	include project(':deds-api')
 }
 

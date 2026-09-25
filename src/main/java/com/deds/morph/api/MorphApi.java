@@ -30,7 +30,7 @@ import java.util.Optional;
  *     <td>{@link #forceMorph}</td></tr>
  * <tr><td>{@code forceDemorph(EntityPlayerMP)}</td><td>{@link #forceDemorph}</td></tr>
  * <tr><td>{@code blacklistEntity(Class)}</td><td>not exposed — our blacklist is
- *     the {@code blacklistedMobs} config/datapack surface, and a runtime
+ *     the {@code blacklistedMobs} config (ids and entity tags), and a runtime
  *     class-keyed blacklist has no 26.2 analogue</td></tr>
  * <tr><td>{@code isEntityAMorph(living, isClient)} → owner name</td>
  *     <td>not exposed — we never spawn a morph ENTITY (the player IS the morph),
@@ -88,7 +88,7 @@ public final class MorphApi {
     /**
      * Acquires {@code target}'s morph for {@code player} and wears it, without
      * killing the target — the original's {@code forceMorph}, which is exactly
-     * what {@code /deds_morph morphtarget} drives. Returns false when a gate
+     * what {@code /morph morphtarget} drives. Returns false when a gate
      * refused (already owned, boss, blacklisted, mid-transformation).
      */
     public static boolean forceMorph(ServerPlayer player, LivingEntity target) {

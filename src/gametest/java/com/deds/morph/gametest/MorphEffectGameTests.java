@@ -217,6 +217,40 @@ public final class MorphEffectGameTests implements CustomTestMethodInvoker {
                 .thenSucceed();
     }
 
+    /** Step height belongs to the FORM: camel (1.5) to horse (1.0) kept 1.5,
+     *  and adult to baby kept the adult's step, because STEP never left the
+     *  ability set so it was never re-applied. */
+    @GameTest(maxTicks = 80)
+    public void stepFollowsTheFormBetweenTwoSteppers(GameTestHelper helper) {
+        ServerPlayer player = mockPlayer(helper);
+        com.deds.morph.MorphVariant camel = com.deds.morph.MorphVariant.ofType(
+                com.deds.api.id.BId.of("minecraft", "camel"));
+        com.deds.morph.MorphVariant horse = com.deds.morph.MorphVariant.ofType(
+                com.deds.api.id.BId.of("minecraft", "horse"));
+        Mob foal = spawn(helper, EntityTypes.HORSE, 1, 1);
+        foal.setBaby(true);
+        com.deds.morph.MorphVariant babyHorse = Morph.variantOf(foal);
+        java.util.List<com.deds.morph.MorphVariant> all = java.util.List.of(camel, horse, babyHorse);
+        helper.startSequence()
+                .thenExecuteAfter(1, () -> Morph.STATE.set(player,
+                        new MorphState(java.util.Optional.of(camel), all)))
+                .thenExecuteAfter(4, () -> {
+                    double sh = player.getAttributeValue(Attributes.STEP_HEIGHT);
+                    helper.assertTrue(Math.abs(sh - 1.5) < 1e-3, "as a camel STEP_HEIGHT must be 1.5 but is " + sh);
+                    Morph.STATE.set(player, new MorphState(java.util.Optional.of(horse), all));
+                })
+                .thenExecuteAfter(4, () -> {
+                    double sh = player.getAttributeValue(Attributes.STEP_HEIGHT);
+                    helper.assertTrue(Math.abs(sh - 1.0) < 1e-3, "camel to horse must give 1.0, not keep 1.5 - is " + sh);
+                    Morph.STATE.set(player, new MorphState(java.util.Optional.of(babyHorse), all));
+                })
+                .thenExecuteAfter(4, () -> {
+                    double sh = player.getAttributeValue(Attributes.STEP_HEIGHT);
+                    helper.assertTrue(sh <= 0.6001, "a baby horse gets no step (~0.6) but is " + sh);
+                })
+                .thenSucceed();
+    }
+
     // ==================================================================
     // 3. morph/ability/fly
     // ==================================================================

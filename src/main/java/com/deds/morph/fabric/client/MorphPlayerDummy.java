@@ -108,4 +108,17 @@ public final class MorphPlayerDummy extends RemotePlayer {
     public boolean isModelPartShown(PlayerModelPart part) {
         return true;
     }
+
+    /** The dummy uses its target's UUID, and a player's spectator/creative
+     *  state is looked up by UUID: a morph of a spectating player rendered as a
+     *  floating head. The dummy itself is never either. */
+    @Override
+    public boolean isSpectator() {
+        return false;
+    }
+
+    @Override
+    public boolean isCreative() {
+        return false;
+    }
 }
