@@ -1,44 +1,81 @@
-# Morph Mod Revived
+<p align="center">
+  <img src="docs/icon.png" align="center" width="180" alt="Morph Mod Revived">
+</p>
 
-**Status: 0.1.0-beta — playable, not finished. Expect bugs and changes.**
+<h1 align="center">Morph Mod Revived</h1>
 
-An unofficial revival of **iChun's Morph** for **Minecraft 26.2 and 26.3** on
-**Fabric**.
+<p align="center"><b>Kill a mob, become the mob.</b></p>
 
-Kill a mob, become the mob. The mobs you slay join your collection of
-morphs, and your body twists into the new shape over a few seconds — bat,
-blaze, creeper and more — while other players watch it happen.
-Open the selector to flip between your collected forms, or return to your own
-skin at any time. You inherit the shape's hitbox and its passive abilities:
-flight, wall-climbing, water breathing, fire immunity, sunburn. It works on
-mobs from other mods too, and on other players.
+<p align="center">
+  <a href="https://modrinth.com/mod/morph-mod-revived"><img src="https://img.shields.io/badge/Download-Modrinth-00AF5C?style=for-the-badge&logo=modrinth&logoColor=white" alt="Download Morph Mod Revived on Modrinth"></a>
+  <a href="https://github.com/ded811/morph-mod-revived"><img src="https://img.shields.io/badge/Source-GitHub-181717?style=for-the-badge&logo=github&logoColor=white" alt="Morph Mod Revived on GitHub"></a>
+</p>
 
-Not made by, endorsed by, or affiliated with iChun.
+<p align="center">
+  <img src="https://img.shields.io/badge/loader-Fabric-DBD0B4?style=flat-square" alt="Fabric">
+  <a href="https://modrinth.com/mod/fabric-api"><img src="https://img.shields.io/badge/also%20install-Fabric%20API-1976D2?style=flat-square" alt="Fabric API on Modrinth"></a>
+  <img src="https://img.shields.io/badge/Minecraft-26.2%20%7C%2026.3-brightgreen?style=flat-square" alt="Minecraft 26.2 and 26.3">
+  <img src="https://img.shields.io/badge/status-beta-orange?style=flat-square" alt="Beta">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/licence-LGPL--3.0-blue?style=flat-square" alt="LGPL-3.0"></a>
+</p>
+
+An unofficial revival of **iChun's Morph**, the classic Minecraft 1.6.4 mod,
+rebuilt for **Minecraft 26.2 and 26.3** on **Fabric**.
+
+The mobs you kill join your collection. Your body twists into their shape
+while everyone nearby watches, and you take on their size and their natural
+abilities: bats fly, spiders climb walls, blazes shrug off fire, fish breathe
+underwater. Switch between your collected forms whenever you like, or go back
+to being yourself. It works on mobs from other mods too, and on other players.
+
+**This is a beta.** It's playable, but it isn't finished, and it isn't an exact
+copy of the original. Please report bugs on the
+[issue tracker](https://github.com/ded811/morph-mod-revived/issues).
+
+## What you get
+
+- **A collection of forms.** Kill a mob you haven't collected yet and a dark
+  copy of it flies into you as you start to change. Variants count separately:
+  sheep colours, slime sizes, villager jobs, babies.
+- **A selector and a favourites wheel.** Press `[` or `]` to open the selector
+  and Enter to change. Hold `` ` `` for a wheel of your starred forms.
+- **The mob's body.** Its size, hitbox and passive abilities: flight, slow
+  falling, wall climbing, swimming, fire immunity, step-up, poison and Wither
+  immunity, monster disguise, and the downsides too, like sunburn and water
+  weakness. Your health and attack stay your own.
+- **Mobs react to your shape.** Monsters leave you alone while you look like
+  one, creepers run from a cat, wolves hunt a sheep.
+- **Multiplayer fun.** Other players can ride you as a horse or a happy ghast,
+  milk you as a cow, and see every transformation.
+
+The full guide, with every control, ability, command and setting, is on the
+[Modrinth page](https://modrinth.com/mod/morph-mod-revived)
+([same text here](docs/MODRINTH.md)).
+
+## What you need
+
+- **Minecraft 26.2 or 26.3** with [**Fabric Loader**](https://fabricmc.net/use/)
+  (0.19.3 or newer for 26.2, 0.19.5 or newer for 26.3)
+- [**Fabric API**](https://modrinth.com/mod/fabric-api)
+- Java 25 or newer
+
+Download the file for your Minecraft version: `+mc26.2` or `+mc26.3`. Each one
+only works on the version in its name. **Ded's API**, the library the mod uses,
+is inside the jar, so there is nothing else to download.
+
+On a server, install it on the server **and** on every player's game.
 
 ## Credit
 
-The original **Morph** is by **iChun** — <https://github.com/iChun/Morph>
+The original **Morph** is by **iChun**: <https://github.com/iChun/Morph>
 (branch `legacy` is the 1.6 line this port studied). The idea, the design, the
 ability set, the selector, **all of the artwork** and all six transition
 sounds are his work. This project ports that work to a modern Minecraft;
 everything good about it is his idea.
 
-## Install
+Not made by, endorsed by, or affiliated with iChun.
 
-1. [Fabric Loader](https://fabricmc.net/use/): 0.19.3+ for Minecraft 26.2, 0.19.5+
-   for 26.3
-2. [Fabric API](https://modrinth.com/mod/fabric-api): 0.155.2+26.2 for 26.2,
-   0.161.0+26.3 for 26.3
-3. Java 25 or newer
-4. Drop the mod jar for YOUR Minecraft version in your `mods` folder:
-   `morph-mod-revived-<version>+mc26.2.jar` or `...+mc26.3.jar`. Each one
-   only loads on the version in its name.
-
-**Ded's API** (`deds_api`) is required and is bundled inside the mod jar, so
-there is nothing extra to download. If you already run another of my revival
-mods, they share the same API and Fabric will sort out which copy to load.
-
-## Build
+## Build it yourself
 
 ```
 ./gradlew build             # Minecraft 26.2
@@ -46,7 +83,7 @@ mods, they share the same API and Fabric will sort out which copy to load.
 ```
 
 Needs JDK 25. The jar lands in `build/libs/`. One set of sources builds both
-versions; `versions/README.md` explains how.
+versions; [`versions/README.md`](versions/README.md) explains how.
 
 ## Licence
 
