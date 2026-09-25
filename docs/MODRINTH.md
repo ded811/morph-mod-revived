@@ -25,7 +25,8 @@ collected forms whenever you like, or go back to being yourself.
    hit, an arrow, a thrown trident, a splash potion or TNT you lit all count,
    but a kill by your pet, or by fire, lava or a fall, doesn't. A dark copy of
    the mob breaks apart and flies into you, and you start turning into it
-   straight away.
+   straight away. A kill made while you're still changing doesn't give a
+   morph.
 2. **Open the morph selector** with `[` or `]`. It appears on the left side of
    the screen. It isn't a menu, so you can keep walking while you pick. Each mob
    you've collected has a row, with a little 3D model and icons for its
@@ -108,7 +109,8 @@ A few more things that come with the body:
   parrots. Blazes, ghasts and vexes keep their speed.
 - **Striders** float in lava instead of sinking, so you can cross it without
   burning, but only slowly. They're slow on land too.
-- **Snow golems** leave a trail of snow behind them.
+- **Snow golems** leave a trail of snow behind them, except in warm biomes or
+  when mob griefing is turned off.
 - **Baby morphs** don't get step-up or sunburn.
 - **What doesn't change:** your health and attack damage stay your own, and so
   does your walking speed, apart from the strider and fish slowdowns above.
@@ -126,16 +128,20 @@ A few more things that come with the body:
   only do that when the server allows PvP.
 - **Mobs treat you as what you look like.** As a cat, creepers run from you. As
   a sheep, wild wolves hunt you. As a villager, zombies chase you. As a zombie,
-  villagers run away, and may call an iron golem. None of this happens on
-  Peaceful or in Creative. When you change form, mobs that were hunting your
-  old shape leave you alone.
+  villagers run away, and may call an iron golem. Mobs never hunt you on
+  Peaceful or in Creative, or while you're invisible or on their team, but mobs
+  that run from your shape still do. When you change form, mobs that were
+  hunting your old shape leave you alone, unless you hit them yourself.
 - **Other players can ride you** while you're a horse, donkey, mule, pig, camel,
   strider, nautilus or happy ghast (skeleton and zombie horses, camel husks and
-  zombie nautiluses count too): they right-click you with an empty hand. They
+  zombie nautiluses count too): they right-click you with an empty hand,
+  without sneaking. They
   can't steer, and changing form throws them off. A happy ghast carries up to
   four.
 - **Other players can milk you as a cow, get stew from you as a mooshroom, or
-  shear you as a sheep**, once every 60 seconds for each item.
+  shear you as a sheep**, once every 60 seconds for each item. It works for any
+  mob that can be milked or sheared, but nobody can trade with a
+  villager-shaped player or scoop a player up in a bucket.
 - **Kill another player and you can become them,** skin included. If they're
   disguised as a mob, you get that mob instead. A player morph is looks only:
   no abilities, normal player size.
@@ -236,7 +242,7 @@ settings screen.
 | `hostileAbilityMode` | `0` | Which monsters ignore you while you're a monster. 0 or 1: all of them. 2: every kind except the one you look like. 3: only the kind you look like. 4: all of them, until you come closer than `hostileAbilityDistanceCheck` blocks. |
 | `hostileAbilityDistanceCheck` | `6` | The distance, in blocks, for mode 4 |
 | `disableEarlyGameFlight` | `0` | 0: flying morphs can fly. 1 or 2: flying morphs can't fly at all (see **How it differs from the original**). |
-| `sortMorphs` | `0` | Selector order. 0: the order you collected them. 1: mobs A to Z. 2: mobs A to Z, and each mob's variants too. 3: most recently worn first (forgotten when you leave the world). |
+| `sortMorphs` | `0` | Selector order. 0: the order you collected them. 1: mobs A to Z. 2: mobs A to Z, and each mob's variants too. 3: the mob you wore last moves to the top, and the rest stay in the order you collected them (forgotten when you leave the world). |
 | `allowMorphSelection` | `true` | Set to `false` to stop the selector and the favourites wheel opening |
 
 These go inside an `"interactions"` or `"ai"` section, as in the example below:

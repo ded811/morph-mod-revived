@@ -103,6 +103,7 @@ WHAT CHANGED, and WHEN:
     default, where the original shipped it off; a mob's voice
     (`sound_variant`) does not make it a separate morph; a new kill always
     turns you into it (the original's `instaMorph` option is not reproduced);
+    a collection is capped at 1,000 morphs;
     and re-acquiring a morph you already own deliberately does not refresh it
     in place. Behaviour, appearance and configuration therefore do not match
     the original one-for-one. This is a revival, not a faithful reproduction.
@@ -185,7 +186,8 @@ changed one URL in the copyright line from `http://fsf.org/` to
       `settings.gradle`, `deds-api/build.gradle`, `gradle.properties`; not
       the Gradle wrapper), the rest of `versions/`
       (per-version properties, rename tables, `versions/README.md`), this
-      NOTICE, `README.md`, `CHANGELOG.md`, `.gitignore` and `.gitattributes`.
+      NOTICE, `README.md`, `CHANGELOG.md`, `PUBLISHING.md`,
+      `docs/MODRINTH.md`, `.gitignore` and `.gitattributes`.
 
       Copyright (C) 2026 Ded811
 
@@ -206,15 +208,16 @@ section 3. The rest of the icon is Ded811's work under the LGPL-3.0.
 
 WHAT WAS MEASURED (2026-07-30):
 
-  * All 23 shipped asset files are byte-identical — verified by SHA-256, file
+  * All 23 of iChun's shipped asset files are byte-identical — verified by SHA-256, file
     by file — to files under `assets/morph/` in the upstream `legacy` branch
     tree at commit `fbf511c`: the four selector-GUI textures
     (`fav`, `guiSelected`, `guiUnselected`, `guiUnselectedSide`), the twelve
     ability icons, `morphskin.png`, and `morph1.ogg` … `morph6.ogg`. Only file
     and directory NAMES were changed, from the original's camelCase to modern
     Minecraft's lowercase resource layout.
-  * Nothing was recoloured, rescaled, re-encoded or re-cut. There is no
-    derived art in this repository at all.
+  * Nothing was recoloured, rescaled, re-encoded or re-cut. Nothing of
+    iChun's was altered; the only other image is the mod's icon, described
+    above.
   * The mod ships no translations of its own beyond an `en_us.json`; the
     original's twenty `.lang` files were not carried over.
 

@@ -5,9 +5,9 @@
 An unofficial revival of **iChun's Morph** for **Minecraft 26.2 and 26.3** on
 **Fabric**.
 
-Kill a mob, become the mob. Every living creature you slay joins your
-collection of morphs, and your body twists into the new shape over a few
-seconds — bat, blaze, creeper, anything — while other players watch it happen.
+Kill a mob, become the mob. The mobs you slay join your collection of
+morphs, and your body twists into the new shape over a few seconds — bat,
+blaze, creeper and more — while other players watch it happen.
 Open the selector to flip between your collected forms, or return to your own
 skin at any time. You inherit the shape's hitbox and its passive abilities:
 flight, wall-climbing, water breathing, fire immunity, sunburn. It works on
