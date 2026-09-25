@@ -8,8 +8,13 @@ gradle-app.setting
 # Release jars, kept out of build/ so the next build cannot overwrite them
 release/
 
-# Fabric Loom
+# Loader run directories. The Fabric and NeoForge mod projects run the
+# canonical Minecraft version in <project>/run/ and any other target in
+# <project>/run-mc<version>/ (see fabric/build.gradle and
+# neoforge/build.gradle), so a world saved by one game version is never
+# opened by another. Their test runs live under build/.
 run/
+run-mc*/
 remappedSrc/
 .loom-cache/
 
@@ -38,3 +43,10 @@ desktop.ini
 *.class
 hs_err_pid*
 replay_pid*
+
+# Python (neoforge/tools/gen_empty_structure.py is meant to be rerun)
+__pycache__/
+*.pyc
+
+# Crash dumps of Git for Windows' own tools
+*.stackdump

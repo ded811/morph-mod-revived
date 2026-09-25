@@ -1,0 +1,71 @@
+// Ded's API - LGPL-3.0-only, copyright (C) 2026 Ded811. See ../../LICENSE,
+// ../../LICENSE.GPL and ../../NOTICE section 3b. Contains no code derived from Morph.
+//
+// The Fabric build of Ded's API: the API core and its loader-neutral
+// internals from ../common, plus the Fabric backend in this directory. The
+// Fabric mod jar nests the result (see fabric/build.gradle).
+
+plugins {
+	id 'net.fabricmc.fabric-loom'
+	id 'java-library'
+}
+
+// Ded's API carries its own version line (api_version in gradle.properties).
+// The mod's fabric.mod.json depends on `deds_api ">=2.0.0 <3.0.0"`, so the
+// nested API jar MUST declare a version inside that range or Fabric Loader
+// rejects the mod at startup.
+version = project.api_version
+group = project.maven_group
+
+base {
+	// Plain "deds-api", as before the split: Loom names the nested file after
+	// this jar, so the mod jar keeps carrying META-INF/jars/deds-api-2.1.0.jar.
+	archivesName = 'deds-api'
+}
+
+sourceSets {
+	main {
+		java.srcDirs = [
+				rootProject.ext.versionedRoot(project, 'deds-api/fabric/src/main/java'),
+				rootProject.ext.versionedRoot(project, 'deds-api/common/src/main/java'),
+		].flatten()
+		resources.srcDirs = [
+				rootProject.ext.versionedRoot(project, 'deds-api/fabric/src/main/resources'),
+				rootProject.ext.versionedRoot(project, 'deds-api/common/src/main/resources'),
+		].flatten()
+	}
+}
+
+dependencies {
+	minecraft "com.mojang:minecraft:${project.minecraft_version}"
+	implementation "net.fabricmc:fabric-loader:${project.loader_version}"
+	implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+}
+
+processResources {
+	def v = project.version
+	def range = project.minecraft_range
+	def mcv = project.minecraft_version
+	inputs.property 'version', v
+	inputs.property 'minecraft_range', range
+	inputs.property 'minecraft_version', mcv
+	filesMatching('fabric.mod.json') {
+		expand 'version': v, 'minecraft_range': range, 'minecraft_version': mcv
+	}
+}
+
+tasks.withType(JavaCompile).configureEach {
+	it.options.release = 25
+	it.options.encoding = 'UTF-8'
+}
+
+java {
+	withSourcesJar()
+	sourceCompatibility = JavaVersion.VERSION_25
+	targetCompatibility = JavaVersion.VERSION_25
+}
+
+tasks.named('check') {
+	dependsOn rootProject.tasks.named('checkVersionedSources')
+	dependsOn rootProject.tasks.named('checkLoaderNeutral')
+}

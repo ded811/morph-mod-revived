@@ -1,0 +1,12 @@
+{
+	"required": true,
+	"minVersion": "0.8",
+	"package": "com.deds.morph.gametest.neoforge.client.mixin",
+	"client": [
+		"InputConstantsTestMixin",
+		"MouseHandlerTestMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	}
+}

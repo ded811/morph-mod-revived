@@ -1,0 +1,7 @@
+# NeoForge-only gametest classes, one fully qualified name per line, registered
+# by the NeoForge test mod after the shared list (common/src/gametest/resources/
+# deds_morph_test/gametest-classes.txt). The root census checkGameTestLists
+# fails the build unless every class under neoforge/src/gametest/java with a
+# @GameTest method is here, and none of them is also in the shared list.
+# Blank lines and lines starting with '#' are ignored.
+com.deds.morph.gametest.neoforge.NeoForgeHarnessGameTests

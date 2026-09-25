@@ -1,0 +1,21 @@
+# The shared server gametest classes, one fully qualified name per line, in
+# registration order. The NeoForge test mod registers its tests from this
+# list; the Fabric test mod lists the same classes as its "fabric-gametest"
+# entrypoints (fabric/src/gametest/resources/fabric.mod.json). The root
+# census checkGameTestLists fails the build unless the two are equal, in the
+# same order, and every class under common/src/gametest/java with a @GameTest
+# method is here. Blank lines and lines starting with '#' are ignored.
+com.deds.morph.gametest.MorphGameTests
+com.deds.morph.gametest.MorphWave2GameTests
+com.deds.morph.gametest.MorphVariantGameTests
+com.deds.morph.gametest.MorphAbilityGameTests
+com.deds.morph.gametest.MorphEffectGameTests
+com.deds.morph.gametest.MorphInteractionGameTests
+com.deds.morph.gametest.MorphAiGameTests
+com.deds.morph.gametest.MorphWave4GameTests
+com.deds.morph.gametest.MorphWave5GameTests
+com.deds.morph.gametest.MorphWave6GameTests
+com.deds.morph.gametest.MorphWave8GameTests
+com.deds.morph.gametest.MorphWave9GameTests
+com.deds.morph.gametest.MorphWave10GameTests
+com.deds.morph.gametest.MorphParityGameTests

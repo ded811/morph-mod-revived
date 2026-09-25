@@ -1,0 +1,44 @@
+modLoader = "javafml"
+loaderVersion = "[11,)"
+license = "LGPL-3.0-only"
+
+[[mods]]
+modId = "deds_api"
+# api_version (gradle.properties), expanded by deds-api/neoforge/build.gradle.
+# Never the mod's version: mods depend on this one by range.
+version = "${version}"
+displayName = "Ded's API"
+authors = "Ded811"
+description = '''
+The tiny shared library behind Ded811's revival mods. Each of them routes its Minecraft and mod-loader plumbing through this one jar, so a single API update keeps every mod working on a new game version. Deliberately minimal (a few dozen small classes) - it adds no blocks, no items, no game content and no measurable overhead. Mods that need it usually bundle it, so there is normally nothing to install separately.
+'''
+
+# The shared config (MouseHandlerMixin), byte-for-byte the one the Fabric
+# build lists in its fabric.mod.json: both loaders run the same Mixin fork.
+[[mixins]]
+config = "deds_api.mixins.json"
+
+# NeoForge only: the hooks Fabric API provides as events and NeoForge does
+# not provide at the same point (the server-stopping hook, the two kill
+# hooks and the two use-entity hooks). Each mirrors the Fabric API mixin at
+# the identical injection point; see the classes for why no NeoForge event
+# is used instead.
+[[mixins]]
+config = "deds_api.neoforge.mixins.json"
+
+# Upper-bounded like every Ded's mod: the mixins are pinned to one Minecraft
+# version's bytecode, so the jar built for 26.2 says [26.2,26.3) here and the
+# 26.3 one [26.3,26.4). Expanded from versions/mc<target>.properties.
+[[dependencies.deds_api]]
+modId = "neoforge"
+type = "required"
+versionRange = "[${minecraft_version},${minecraft_version_next})"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.deds_api]]
+modId = "minecraft"
+type = "required"
+versionRange = "[${minecraft_version},${minecraft_version_next})"
+ordering = "NONE"
+side = "BOTH"

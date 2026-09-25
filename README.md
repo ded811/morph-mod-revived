@@ -12,15 +12,15 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/loader-Fabric-DBD0B4?style=flat-square" alt="Fabric">
-  <a href="https://modrinth.com/mod/fabric-api"><img src="https://img.shields.io/badge/also%20install-Fabric%20API-1976D2?style=flat-square" alt="Fabric API on Modrinth"></a>
+  <img src="https://img.shields.io/badge/loader-Fabric%20%7C%20NeoForge-5B4FCF?style=flat-square" alt="Fabric and NeoForge">
+  <a href="https://modrinth.com/mod/fabric-api"><img src="https://img.shields.io/badge/on%20Fabric%2C%20also%20install-Fabric%20API-1976D2?style=flat-square" alt="Fabric API on Modrinth"></a>
   <img src="https://img.shields.io/badge/Minecraft-26.2%20%7C%2026.3-brightgreen?style=flat-square" alt="Minecraft 26.2 and 26.3">
   <img src="https://img.shields.io/badge/status-beta-orange?style=flat-square" alt="Beta">
   <a href="LICENSE"><img src="https://img.shields.io/badge/licence-LGPL--3.0-blue?style=flat-square" alt="LGPL-3.0"></a>
 </p>
 
 An unofficial revival of **iChun's Morph**, the classic Minecraft 1.6.4 mod,
-rebuilt for **Minecraft 26.2 and 26.3** on **Fabric**.
+rebuilt for **Minecraft 26.2 and 26.3** on **Fabric** and **NeoForge**.
 
 The mobs you kill join your collection. Your body twists into their shape
 while everyone nearby watches, and you take on their size and their natural
@@ -54,16 +54,24 @@ The full guide, with every control, ability, command and setting, is on the
 
 ## What you need
 
-- **Minecraft 26.2 or 26.3** with [**Fabric Loader**](https://fabricmc.net/use/)
-  (0.19.3 or newer for 26.2, 0.19.5 or newer for 26.3)
-- [**Fabric API**](https://modrinth.com/mod/fabric-api)
+- **Minecraft 26.2 or 26.3**, with one of:
+  - [**Fabric Loader**](https://fabricmc.net/use/) (0.19.3 or newer for 26.2,
+    0.19.5 or newer for 26.3) and [**Fabric API**](https://modrinth.com/mod/fabric-api)
+  - [**NeoForge**](https://neoforged.net/) for the same Minecraft version
+    (tested with 26.2.0.75, 26.2.0.88, 26.3.0.7-beta and 26.3.0.16-beta). Fabric API isn't needed there.
 - Java 25 or newer
 
-Download the file for your Minecraft version: `+mc26.2` or `+mc26.3`. Each one
-only works on the version in its name. **Ded's API**, the library the mod uses,
-is inside the jar, so there is nothing else to download.
+Download the file for your loader and your Minecraft version:
+`morph-mod-revived-fabric-<version>+mc26.2.jar` is for Fabric on 26.2,
+`morph-mod-revived-neoforge-<version>+mc26.3.jar` is for NeoForge on 26.3, and
+so on. Each one only works on the loader and the version in its name.
+**Ded's API**, the library the mod uses, is inside the jar, so there is
+nothing else to download.
 
-On a server, install it on the server **and** on every player's game.
+On a server, install it on the server **and** on every player's game, using
+the same loader on both. A player running NeoForge without the mod can't
+join a server that has it. Each loader saves morph collections in its own way,
+so a world moved between Fabric and NeoForge loses them.
 
 ## Credit
 
@@ -78,12 +86,20 @@ Not made by, endorsed by, or affiliated with iChun.
 ## Build it yourself
 
 ```
-./gradlew build             # Minecraft 26.2
-./gradlew build -Pmc=26.3   # Minecraft 26.3
+./gradlew build             # Minecraft 26.2, both loaders
+./gradlew build -Pmc=26.3   # Minecraft 26.3, both loaders
 ```
 
-Needs JDK 25. The jar lands in `build/libs/`. One set of sources builds both
-versions; [`versions/README.md`](versions/README.md) explains how.
+Each build makes both jars and runs the server tests on both loaders. The
+jars land in `fabric/build/libs/` and `neoforge/build/libs/`. The client
+tests open a game window, so they are separate:
+`./gradlew :fabric:runClientGameTest` and `./gradlew :neoforge:runClientGameTest`.
+
+Needs JDK 25. The NeoForge build tools also need a JDK 21, which Gradle
+downloads by itself if you don't have one. One set of sources builds both
+loaders and both Minecraft versions: `common/` holds the shared code,
+`fabric/` and `neoforge/` the parts for each loader, and
+[`versions/README.md`](versions/README.md) explains how the versions work.
 
 ## Licence
 

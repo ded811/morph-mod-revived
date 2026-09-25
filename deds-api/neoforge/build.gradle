@@ -1,0 +1,92 @@
+// Ded's API - LGPL-3.0-only, copyright (C) 2026 Ded811. See ../../LICENSE,
+// ../../LICENSE.GPL and ../../NOTICE section 3b. Contains no code derived from Morph.
+//
+// The NeoForge build of Ded's API: the API core and its loader-neutral
+// internals from ../common, plus the NeoForge backend in this directory. The
+// NeoForge mod jar carries the result jar-in-jar (see neoforge/build.gradle),
+// exactly as the Fabric mod jar nests the Fabric build.
+//
+// ModDevGradle, tested with NeoForge 26.2.0.75 and 26.3.0.7-beta. This
+// project has no runs of its own: the :neoforge project runs the game with
+// this project's classes as the deds_api mod (its `mods { deds_api }` block).
+
+plugins {
+	id 'net.neoforged.moddev'
+	id 'java-library'
+}
+
+// Ded's API carries its own version line (api_version in gradle.properties),
+// NOT the mod's. Copying the mod projects' `version = project.mod_version_full`
+// here would expand the toml's ${version} to the mod's version
+// (mod_version_full, such as 0.2.0-beta+mc26.2), and FML would
+// refuse to load deds_morph, whose toml requires deds_api [2.0.0,3.0.0): in
+// dev AND in production, because the jar-in-jar metadata would carry the
+// same wrong version. gradle.properties documents the same trap for Fabric.
+version = project.api_version
+group = project.maven_group
+
+base {
+	// "-neoforge": the Fabric build is plain "deds-api" (Loom names the nested
+	// file after it). This name plus the group is also the jar-in-jar
+	// identity (com.deds:deds-api-neoforge) every Ded's mod that nests the
+	// NeoForge API must share, so FML can pick the newest copy of them all.
+	archivesName = 'deds-api-neoforge'
+}
+
+neoForge {
+	version = project.neoforge_version
+}
+
+// Every root through rootProject.versionedRoot, exactly as the Fabric API
+// project does: the directory itself for the canonical Minecraft version, the
+// rename-table + overlay copy under build/versioned/ for a derived target.
+// This project's own tree has a 26.3 overlay (the client use-entity mixin,
+// whose 26.3 twin needs the new swing arguments).
+sourceSets {
+	main {
+		java.srcDirs = [
+				rootProject.ext.versionedRoot(project, 'deds-api/neoforge/src/main/java'),
+				rootProject.ext.versionedRoot(project, 'deds-api/common/src/main/java'),
+		].flatten()
+		resources.srcDirs = [
+				rootProject.ext.versionedRoot(project, 'deds-api/neoforge/src/main/resources'),
+				rootProject.ext.versionedRoot(project, 'deds-api/common/src/main/resources'),
+		].flatten()
+	}
+}
+
+processResources {
+	def v = project.version
+	def mcv = project.minecraft_version
+	def mcNext = project.minecraft_version_next
+	inputs.property 'version', v
+	inputs.property 'minecraft_version', mcv
+	inputs.property 'minecraft_version_next', mcNext
+	// The toml's version (api_version, see above) and the two Minecraft
+	// version bounds; the mixin configs and the services file pass through.
+	filesMatching('META-INF/neoforge.mods.toml') {
+		expand 'version': v, 'minecraft_version': mcv, 'minecraft_version_next': mcNext
+	}
+}
+
+tasks.withType(JavaCompile).configureEach {
+	it.options.release = 25
+	it.options.encoding = 'UTF-8'
+}
+
+java {
+	// Like the Fabric projects: the licence trio goes into the sources jar
+	// too, see the root build.gradle.
+	withSourcesJar()
+	sourceCompatibility = JavaVersion.VERSION_25
+	targetCompatibility = JavaVersion.VERSION_25
+	// ModDevGradle runs its own tooling on a toolchain JVM; pin it to the 25
+	// the mod targets (NeoForm's own JDK 21 comes from the foojay resolver in
+	// settings.gradle).
+	toolchain.languageVersion = JavaLanguageVersion.of(25)
+}
+
+tasks.named('check') {
+	dependsOn rootProject.tasks.named('checkVersionedSources')
+	dependsOn rootProject.tasks.named('checkLoaderNeutral')
+}

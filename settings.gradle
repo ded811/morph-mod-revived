@@ -4,15 +4,46 @@ pluginManagement {
 			name = 'Fabric'
 			url = 'https://maven.fabricmc.net/'
 		}
+		// NeoForge's plugins and artefacts (ModDevGradle, NeoForge, FML), for
+		// the two NeoForge projects.
+		maven {
+			name = 'NeoForged'
+			url = 'https://maven.neoforged.net/releases'
+		}
 		mavenCentral()
 		gradlePluginPortal()
 	}
 }
 
+// ModDevGradle (the NeoForge projects) runs NeoForge's decompile/patch
+// tooling on a JDK 21 toolchain and hardcodes that version (its NeoForm
+// runtime task sets languageVersion 21 and exposes no override). The foojay
+// resolver below downloads a JDK 21 for that tooling if none is installed.
+// The mods themselves still compile and run on 25 - this affects the build
+// tools, not the artefacts.
+plugins {
+	id 'org.gradle.toolchains.foojay-resolver-convention' version '1.0.0'
+}
+
 rootProject.name = 'morph-mod-revived'
 
+// One Gradle project per loader artefact; flat names, custom directories.
+// The shared trees (common/, deds-api/common/) are NOT projects: each loader
+// project compiles them itself (see the root build.gradle).
+//
+//   :fabric              fabric/              the Fabric mod jar
+//   :deds-api-fabric     deds-api/fabric/     Ded's API for Fabric, nested in it
+//   :neoforge            neoforge/            the NeoForge mod jar
+//   :deds-api-neoforge   deds-api/neoforge/   Ded's API for NeoForge, jar-in-jar
+//                                             inside it
+//
 // Ded's API is vendored into this repository (see NOTICE section 3(b)) so
-// that a fresh clone builds with no external Maven setup.
-// Like the mod it is LGPL-3.0, but it is Ded811's own work, independent of
-// the mod in `src/`, and contains no code derived from Morph.
-include ':deds-api'
+// that a fresh clone builds with no external Maven setup. Like the mod it is
+// LGPL-3.0, but it is Ded811's own work, independent of the mod, and
+// contains no code derived from Morph.
+include ':fabric'
+include ':deds-api-fabric'
+project(':deds-api-fabric').projectDir = file('deds-api/fabric')
+include ':neoforge'
+include ':deds-api-neoforge'
+project(':deds-api-neoforge').projectDir = file('deds-api/neoforge')

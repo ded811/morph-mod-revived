@@ -1,0 +1,28 @@
+{
+	"schemaVersion": 1,
+	"id": "deds_morph",
+	"version": "${version}",
+	"name": "Morph Mod Revived",
+	"description": "Kill a mob, become the mob. The mobs you slay join your collection of morphs, and your body twists into the new shape over a few seconds (bat, blaze, creeper and more) while other players watch it happen. Open the selector to flip between your collected forms, or return to your own skin. The iconic shapeshifting chaos of iChun's 1.6.4 Morph, ported to Minecraft ${minecraft_version} on Fabric. Original mod by iChun; unofficial fan revival, all credit for the original design to iChun.",
+	"authors": ["Ded811"],
+	"contributors": ["iChun (original Morph author)"],
+	"license": "LGPL-3.0-only",
+	"icon": "assets/deds_morph/icon.png",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"com.deds.morph.fabric.MorphFabric"
+		],
+		"client": [
+			"com.deds.morph.fabric.MorphFabricClient"
+		]
+	},
+	"mixins": ["deds_morph.client.mixins.json", "deds_morph.mixins.json", "deds_morph.version.mixins.json", "deds_morph.fabric.mixins.json"],
+	"depends": {
+		"fabricloader": ">=0.19.3",
+		"minecraft": "${minecraft_range}",
+		"java": ">=25",
+		"fabric-api": "*",
+		"deds_api": ">=2.0.0 <3.0.0"
+	}
+}

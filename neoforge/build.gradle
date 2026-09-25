@@ -1,0 +1,256 @@
+// The NeoForge package of Morph Mod Revived: morph-mod-revived-neoforge-<version>.jar,
+// with Ded's API (the :deds-api-neoforge project) inside it as a jar-in-jar.
+//
+// The NeoForge twin of fabric/build.gradle: this project holds only the
+// loader files (the two @Mod entrypoints, neoforge.mods.toml, the NeoForge-
+// only mixins and the MorphLoader implementation, plus the NeoForge test mod
+// under src/gametest) and compiles the shared mod from ../common as its own
+// source, exactly as the Fabric project does. See the root build.gradle for
+// why shared code is plain source rather than a project.
+//
+// ModDevGradle, tested with NeoForge 26.2.0.75 and 26.3.0.7-beta.
+//
+// ORDER OF THE BLOCKS BELOW IS LOAD BEARING. Three ModDevGradle rules:
+//  - neoForge.version must be set before addModdingDependenciesTo (MDG
+//    throws until it is);
+//  - the gametest source set must exist before addModdingDependenciesTo and
+//    before `mods { deds_morph_test }` names it;
+//  - project(':deds-api-neoforge').sourceSets is read in `mods { deds_api }`,
+//    which only works because evaluationDependsOn makes Gradle configure that
+//    project first (otherwise it happens to work, by alphabetical order).
+// A Groovy script `def` is only visible to closures declared after it, and
+// tasks.named('x') throws for a task not registered yet, so the order is the
+// fix: plugins; evaluationDependsOn; neoForge.version; source sets;
+// addModdingDependenciesTo; dependencies; the wipe task; mods and runs;
+// check.
+
+plugins {
+	id 'net.neoforged.moddev'
+	id 'java-library'
+}
+
+evaluationDependsOn(':deds-api-neoforge')
+
+// 0.1.0-beta+mc26.2: the mod version and the Minecraft it is for, derived by
+// the root build from gradle.properties and versions/mc<target>.properties.
+version = project.mod_version_full
+group = project.maven_group
+
+base {
+	// "-neoforge" beside morph-mod-revived-fabric under one mod version.
+	archivesName = 'morph-mod-revived-neoforge'
+}
+
+// One run directory per Minecraft version: the canonical version keeps
+// `run`, every other target gets `run-mc<version>`, so a world
+// saved by one game version is never opened - and silently upgraded - by
+// another. ModDevGradle never wipes it.
+def morphRunDirName = project.mc_is_canonical ? 'run' : "run-mc${project.mc}".toString()
+
+neoForge {
+	version = project.neoforge_version
+}
+
+// THE SHARED MOD, and this project's own trees, every root through
+// rootProject.versionedRoot: the directory itself (plus its canonical-only
+// overlay) for the canonical Minecraft version, the rename-table + overlay
+// copy under build/versioned/ for a derived target. The two NeoForge hand
+// mixin configs live only in versions/mc<v>/neoforge/src/main/resources
+// (one per version, see deds_morph.neoforge.hand.mixins.json), and the 26.2
+// hand mixin class only in versions/mc26.2/neoforge/src/main/java.
+//
+// gametest: the NeoForge test mod (deds_morph_test) = neoforge/src/gametest
+// (its toml, the registrar, the NeoForge-only server gametest, the clean-room
+// stand-ins for Fabric's two gametest API types, the SyncProbe, the empty
+// structure, and the client test driver: MorphNeoForgeClientTests,
+// ClientTestDriver, its two input mixins and deds_morph_test.mixins.json)
+// + common/src/gametest (the shared server gametests and their test
+// environments). `+=` for the
+// classpaths, never `=`: ModDevGradle adds its launcher to the run source
+// set's runtime classpath configuration later.
+sourceSets {
+	main {
+		java.srcDirs = [
+				rootProject.ext.versionedRoot(project, 'neoforge/src/main/java'),
+				rootProject.ext.versionedRoot(project, 'common/src/main/java'),
+		].flatten()
+		resources.srcDirs = [
+				rootProject.ext.versionedRoot(project, 'neoforge/src/main/resources'),
+				rootProject.ext.versionedRoot(project, 'common/src/main/resources'),
+		].flatten()
+	}
+	gametest {
+		java.srcDirs = [
+				rootProject.ext.versionedRoot(project, 'neoforge/src/gametest/java'),
+				rootProject.ext.versionedRoot(project, 'common/src/gametest/java'),
+		].flatten()
+		resources.srcDirs = [
+				rootProject.ext.versionedRoot(project, 'neoforge/src/gametest/resources'),
+				rootProject.ext.versionedRoot(project, 'common/src/gametest/resources'),
+		].flatten()
+		compileClasspath += sourceSets.main.output
+		runtimeClasspath += sourceSets.main.output
+	}
+}
+
+// Minecraft + NeoForge for the test mod too (MDG only wires `main` by itself).
+neoForge.addModdingDependenciesTo(sourceSets.gametest)
+
+dependencies {
+	// Ded's API: compileOnly, NEVER implementation. Its classes reach the game
+	// as the deds_api mod through `mods { deds_api }` below; its JAR on the
+	// run's runtime classpath as well would be a second deds_api candidate
+	// (FML's in-dev jar locator adds every classpath jar with a
+	// neoforge.mods.toml, then silently keeps one of the two).
+	compileOnly project(':deds-api-neoforge')
+	// The test mod compiles against the API too; MDG's
+	// addModdingDependenciesTo brings Minecraft and NeoForge, not main's
+	// compileOnly dependencies.
+	gametestCompileOnly project(':deds-api-neoforge')
+	// Ship Ded's API inside the mod jar (META-INF/jarjar/), so players
+	// download one file, as on Fabric. Identity com.deds:deds-api-neoforge,
+	// range [<api_version>,): FML keeps the newest copy of every jar-in-jar
+	// deds_api across all installed Ded's mods.
+	jarJar project(':deds-api-neoforge')
+}
+
+// The client test driver's game directory, deleted before every
+// runClientGameTest (Fabric's client gametests also start from a fresh
+// directory each time): a world, options.txt, results file or screenshot
+// left over from the previous run would otherwise change what the next run
+// sees, or stand in for a picture it never took. Declared above `runs {}`,
+// which names it (see the header on ordering).
+def wipeClientGameTestDir = tasks.register('wipeClientGameTestDir', Delete) {
+	group = 'verification'
+	description = 'Deletes build/run/clientGameTest before the NeoForge client test driver runs.'
+	delete layout.buildDirectory.dir('run/clientGameTest')
+}
+
+neoForge {
+	mods {
+		deds_morph {
+			sourceSet sourceSets.main
+		}
+		deds_api {
+			sourceSet project(':deds-api-neoforge').sourceSets.main
+		}
+		deds_morph_test {
+			sourceSet sourceSets.gametest
+		}
+	}
+
+	runs {
+		// `./gradlew :neoforge:runClient`: the mod and the API, no test mod.
+		client {
+			client()
+			gameDirectory = layout.projectDirectory.dir(morphRunDirName)
+			loadedMods = [neoForge.mods.deds_morph, neoForge.mods.deds_api]
+		}
+
+		// The server gametests, the NeoForge twin of Loom's runGameTest: all
+		// three mods (the default), NeoForge's own gametest server, which
+		// deletes and recreates its world on every run.
+		//
+		// NOT the same world rules as Fabric's run, and no test may depend on
+		// either set: NeoForge's patched GameTestServer sets spawn_mobs=false
+		// and advance_weather=false and reports isDedicatedServer() false;
+		// Fabric runs vanilla's GameTestServer with the default rules (mobs
+		// and weather on), keeps its world between runs, and Fabric API forces
+		// isDedicatedServer() true.
+		//
+		// `--tests deds_morph_test:*` is a guard, not a filter: with no
+		// selector vanilla runs EVERY registered test, which includes its own
+		// optional minecraft:always_pass, so a registrar that registered
+		// nothing (a missing class list, a listener on the wrong bus) would
+		// start, pass that one optional test and exit 0. With a selector that
+		// matches nothing the server exits -1 and the build fails. The
+		// registrar also throws on an empty list and on a listed class that
+		// yields no test, and the root census checkGameTestLists fails the
+		// build first if a listed class declares no @GameTest method.
+		gameTestServer {
+			type = 'gameTestServer'
+			sourceSet = sourceSets.gametest
+			gameDirectory = layout.buildDirectory.dir('run/gameTestServer')
+			programArgument '--tests'
+			programArgument 'deds_morph_test:*'
+		}
+
+		// `./gradlew :neoforge:runClientGameTest`: the NeoForge twin of Loom's
+		// runClientGameTest. NeoForge 26.x ships no client gametest API, so
+		// the test mod carries its own driver (MorphNeoForgeClientTests, a
+		// client-only @Mod class, active only with -Dmorph.clientTest=true):
+		// it creates a flat creative world the way Fabric's harness does, runs
+		// the scenarios, takes the screenshots, writes
+		// morph-client-test-results.txt into this game directory and exits
+		// 0 only if every check passed, so a failure fails this task. The
+		// window size is the one the Fabric harness shoots its world at.
+		// Not part of `check`: it opens a game window, like Loom's
+		// runClientGameTest, which `check` does not run either.
+		clientGameTest {
+			client()
+			sourceSet = sourceSets.gametest
+			gameDirectory = layout.buildDirectory.dir('run/clientGameTest')
+			loadedMods = [neoForge.mods.deds_morph, neoForge.mods.deds_api,
+					neoForge.mods.deds_morph_test]
+			systemProperty 'morph.clientTest', 'true'
+			programArgument '--width'
+			programArgument '1920'
+			programArgument '--height'
+			programArgument '1080'
+			taskBefore wipeClientGameTestDir
+		}
+	}
+}
+
+tasks.withType(JavaCompile).configureEach {
+	it.options.release = 25
+	it.options.encoding = 'UTF-8'
+}
+
+java {
+	// The licence trio goes into the sources jar too (root build.gradle).
+	withSourcesJar()
+	sourceCompatibility = JavaVersion.VERSION_25
+	targetCompatibility = JavaVersion.VERSION_25
+	// ModDevGradle runs its own tooling on a toolchain JVM; pin it to the 25
+	// the mod targets (NeoForm's own JDK 21 comes from the foojay resolver in
+	// settings.gradle).
+	toolchain.languageVersion = JavaLanguageVersion.of(25)
+}
+
+processResources {
+	def v = project.version
+	def mcv = project.minecraft_version
+	def mcNext = project.minecraft_version_next
+	inputs.property 'version', v
+	inputs.property 'minecraft_version', mcv
+	inputs.property 'minecraft_version_next', mcNext
+	// The toml's version, the description's Minecraft version and the two
+	// Minecraft version bounds; every mixin config passes through untouched.
+	filesMatching('META-INF/neoforge.mods.toml') {
+		expand 'version': v, 'minecraft_version': mcv, 'minecraft_version_next': mcNext
+	}
+}
+
+// A hard ceiling on the client test. Its own watchdog (25 minutes, in
+// ClientTestDriver) runs only once the test mod is constructed; a failure
+// before that (a bad toml range, a mod constructor that throws) leaves FML's
+// fatal-error window waiting for a human to close it, and the task would
+// never end. 30 minutes, so the watchdog still gets to write its results
+// file first. Gradle kills the game JVM when the timeout fires. A name match,
+// because MDG registers its run tasks after this script has run.
+tasks.matching { it.name == 'runClientGameTest' }.configureEach {
+	timeout = java.time.Duration.ofMinutes(30)
+}
+
+// Parity with Loom, whose `check` depends on runGameTest: a plain
+// `./gradlew build` runs the server gametests on NeoForge too (MDG wires no
+// run into `check` by itself, and a non-zero exit of the run fails the task).
+// A task NAME, resolved when the graph is built: MDG registers its run tasks
+// after this script has run. Plus the root censuses, as on Fabric.
+tasks.named('check') {
+	dependsOn 'runGameTestServer'
+	dependsOn rootProject.tasks.named('checkVersionedSources')
+	dependsOn rootProject.tasks.named('checkLoaderNeutral')
+	dependsOn rootProject.tasks.named('checkGameTestLists')
+}

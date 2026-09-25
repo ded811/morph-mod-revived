@@ -1,0 +1,77 @@
+modLoader = "javafml"
+loaderVersion = "[11,)"
+license = "LGPL-3.0-only"
+issueTrackerURL = "https://github.com/ded811/morph-mod-revived/issues"
+
+[[mods]]
+modId = "deds_morph"
+version = "${version}"
+displayName = "Morph Mod Revived"
+authors = "Ded811"
+credits = "iChun (original Morph author)"
+displayURL = "https://modrinth.com/mod/morph-mod-revived"
+# The square badge in NeoForge's mod list. FML's own ModInfo only knows
+# logoFile (deprecated: NeoForge warns about it in dev); NeoForge's mod list
+# reads iconFile for the square icon and bannerFile for the wide strip
+# (DefaultModDisplayInfo, the same in 26.2 and 26.3). The icon is square, so
+# only iconFile: as a banner it would be stretched across the strip. A plain
+# path is a root resource of this mod's own pack.
+iconFile = "assets/deds_morph/icon.png"
+description = '''
+Kill a mob, become the mob. The mobs you slay join your collection of morphs, and your body twists into the new shape over a few seconds (bat, blaze, creeper and more) while other players watch it happen. Open the selector to flip between your collected forms, or return to your own skin. The iconic shapeshifting chaos of iChun's 1.6.4 Morph, ported to Minecraft ${minecraft_version} on NeoForge. Original mod by iChun; unofficial fan revival, all credit for the original design to iChun.
+'''
+
+# The three shared configs, byte-for-byte the ones fabric.mod.json lists:
+# both loaders run the same Mixin fork, and every shared mixin applies to the
+# same member with the same match count on the NeoForge-patched game.
+[[mixins]]
+config = "deds_morph.mixins.json"
+
+[[mixins]]
+config = "deds_morph.client.mixins.json"
+
+# Empty on 26.2; LevelExtractorPlayerStateMixin on 26.3.
+[[mixins]]
+config = "deds_morph.version.mixins.json"
+
+# NeoForge only: the HUD hook (where Fabric API draws Morph's selector and
+# radial) and the turtle-helmet correction for NeoForge's changed Player.tick.
+[[mixins]]
+config = "deds_morph.neoforge.mixins.json"
+
+# NeoForge only, one per Minecraft version: the first-person morph hand.
+# NeoForge 26.2 routes hand rendering through a 6-argument overload of its
+# own and leaves vanilla's 5-argument one as a shim nothing calls; 26.3 has
+# only the vanilla one. See the two versions/mc<v>/ copies of this config.
+[[mixins]]
+config = "deds_morph.neoforge.hand.mixins.json"
+
+# Upper-bounded on purpose: every mixin is pinned to one Minecraft version's
+# bytecode, so the jar built for 26.2 says [26.2,26.3) here and the 26.3 one
+# [26.3,26.4). Expanded from versions/mc<target>.properties.
+[[dependencies.deds_morph]]
+modId = "neoforge"
+type = "required"
+versionRange = "[${minecraft_version},${minecraft_version_next})"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.deds_morph]]
+modId = "minecraft"
+type = "required"
+versionRange = "[${minecraft_version},${minecraft_version_next})"
+ordering = "NONE"
+side = "BOTH"
+
+# The same range as fabric.mod.json's ">=2.0.0 <3.0.0" (the API is additive
+# within a major version). ordering "AFTER", in upper case (FML upper-cases
+# `type` but not `ordering`): FML constructs mods in parallel unless an
+# ordering links them, and Ded's API must be constructed first, because its
+# client key backend is installed in its constructor and Morph registers its
+# keys in its own.
+[[dependencies.deds_morph]]
+modId = "deds_api"
+type = "required"
+versionRange = "[2.0.0,3.0.0)"
+ordering = "AFTER"
+side = "BOTH"

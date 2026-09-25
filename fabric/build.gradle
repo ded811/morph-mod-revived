@@ -1,0 +1,159 @@
+// The Fabric package of Morph Mod Revived: morph-mod-revived-fabric-<version>.jar,
+// with Ded's API (the :deds-api-fabric project) nested inside it.
+//
+// Before the loader split this was the root project of a single-project
+// build. It moved here with its settings unchanged: the same Loom, the same
+// dependencies, the same gametest setup, the same manifest expansion. What
+// is new is only where the sources come from - the shared trees under
+// ../common are added to this project's source sets (see the root
+// build.gradle for why shared code is plain source rather than a project).
+//
+// This project's own sources are the two Fabric entrypoints, fabric.mod.json,
+// the Fabric-only hand mixin config, and the client render test, which uses
+// Fabric's client gametest API and so cannot be shared.
+
+plugins {
+	id 'net.fabricmc.fabric-loom'
+	id 'java-library'
+}
+
+// 0.1.0-beta+mc26.2: the mod version and the Minecraft it is for, derived by
+// the root build from gradle.properties and versions/mc<target>.properties.
+version = project.mod_version_full
+group = project.maven_group
+
+base {
+	// "-fabric" because the NeoForge jar sits beside it under one mod
+	// version. The nested Ded's API keeps its own file name (see
+	// deds-api/fabric/build.gradle).
+	archivesName = 'morph-mod-revived-fabric'
+}
+
+// THE SHARED MOD. common/ is plain source: this project compiles it as its
+// own, and so does the NeoForge project. Every root goes through
+// rootProject.versionedRoot: for the canonical Minecraft version that is the
+// directory itself (plus its canonical-only overlay, if any), and for a
+// derived target (-Pmc=26.3) it is the copy under build/versioned/ that the
+// rename table and the versions/mc<target>/ overlay produce. This project's
+// own src/main goes through it too: the entrypoints import shared classes,
+// which a derived target may rename. See versions/README.md.
+sourceSets {
+	main {
+		java.srcDirs = [
+				rootProject.ext.versionedRoot(project, 'fabric/src/main/java'),
+				rootProject.ext.versionedRoot(project, 'common/src/main/java'),
+		].flatten()
+		resources.srcDirs = [
+				rootProject.ext.versionedRoot(project, 'fabric/src/main/resources'),
+				rootProject.ext.versionedRoot(project, 'common/src/main/resources'),
+		].flatten()
+	}
+}
+
+dependencies {
+	minecraft "com.mojang:minecraft:${project.minecraft_version}"
+	implementation "net.fabricmc:fabric-loader:${project.loader_version}"
+	implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+	// 26.x is unobfuscated: no mappings line.
+
+	implementation project(':deds-api-fabric')
+	// Nest Ded's API inside the mod jar so players only download one file.
+	// Separately identified in NOTICE section 3.
+	include project(':deds-api-fabric')
+}
+
+fabricApi {
+	configureTests {
+		createSourceSet = true
+		modId = 'deds_morph_test'
+		enableGameTests = true
+		// `./gradlew :fabric:runClientGameTest` boots a real client - the only
+		// layer that can see the morph render stack at all - and screenshots
+		// it for a human, on top of hard assertions on the two render-state
+		// fields vanilla's lie-down branch keys on. NOT part of `build`: it
+		// needs a display.
+		enableClientGameTests = true
+		eula = true
+	}
+}
+
+// The gametest source set configureTests created above, pointed at the
+// versioned copies of its roots for the same reason main is. This block must
+// come AFTER fabricApi.configureTests: that call creates the source set, and
+// declaring it first makes Loom's create() throw.
+//
+// Two roots: fabric/src/gametest (the client render test, which needs
+// Fabric's client gametest API, and the test mod's fabric.mod.json) and
+// common/src/gametest (the server gametests and their test environments,
+// which the NeoForge test mod runs too). Loom's
+// -Dfabric.client.gametest.testModResourcesPath is read when configureTests
+// creates the set, so it is Gradle's default fabric/src/gametest/resources
+// whatever order these are in; it only feeds screenshot COMPARISON templates,
+// which this suite does not use.
+sourceSets {
+	gametest {
+		java.srcDirs = [
+				rootProject.ext.versionedRoot(project, 'fabric/src/gametest/java'),
+				rootProject.ext.versionedRoot(project, 'common/src/gametest/java'),
+		].flatten()
+		resources.srcDirs = [
+				rootProject.ext.versionedRoot(project, 'fabric/src/gametest/resources'),
+				rootProject.ext.versionedRoot(project, 'common/src/gametest/resources'),
+		].flatten()
+	}
+}
+
+// One world per Minecraft version, the NeoForge project's rule: the canonical
+// version keeps Loom's default directories, every other target gets its own,
+// so a world saved by one game version is never opened by another. Loom's
+// server gametest run KEEPS its world between runs (night.json relies on
+// that), and 26.2 cannot read chunk sections 26.3 saved: sharing the
+// directory flooded every 26.2 run after a 26.3 one with chunk-load errors
+// and ran it on sections replaced by defaults. The client test needs nothing:
+// Loom deletes its directory before every run. After configureTests, which
+// creates the gameTest run.
+if (!project.mc_is_canonical) {
+	loom {
+		runs {
+			gameTest {
+				runDir "build/run/gameTest-mc${project.mc}"
+			}
+			client {
+				runDir "run-mc${project.mc}"
+			}
+		}
+	}
+}
+
+processResources {
+	def v = project.version
+	def range = project.minecraft_range
+	def mcv = project.minecraft_version
+	inputs.property 'version', v
+	inputs.property 'minecraft_range', range
+	inputs.property 'minecraft_version', mcv
+	filesMatching('fabric.mod.json') {
+		expand 'version': v, 'minecraft_range': range, 'minecraft_version': mcv
+	}
+}
+
+tasks.withType(JavaCompile).configureEach {
+	it.options.release = 25
+	it.options.encoding = 'UTF-8'
+}
+
+java {
+	withSourcesJar()
+	sourceCompatibility = JavaVersion.VERSION_25
+	targetCompatibility = JavaVersion.VERSION_25
+}
+
+// The root censuses, so a plain `./gradlew build` runs them. Loom already
+// wires `check` to runGameTest (the server gametests). checkGameTestLists
+// guards this project's test mod too: its fabric.mod.json "fabric-gametest"
+// array must stay equal to the shared list the NeoForge test mod reads.
+tasks.named('check') {
+	dependsOn rootProject.tasks.named('checkVersionedSources')
+	dependsOn rootProject.tasks.named('checkLoaderNeutral')
+	dependsOn rootProject.tasks.named('checkGameTestLists')
+}

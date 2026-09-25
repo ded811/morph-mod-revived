@@ -1,0 +1,6 @@
+{
+  "_comment": "Pins the overworld clock to MIDNIGHT (18000) for the sleep gametest. 26.2's Player.tick force-wakes any sleeper whose position fails the BED_RULE environment attribute, and the overworld's rule is WHEN_DARK = Level.isDarkOutside() (javap), so a sleep held across driven living ticks is impossible in daylight. Fabric's gametest server SAVES AND REUSES its world (fabric/build/run/gameTest/world/ for the canonical version, fabric/build/run/gameTest-mc<version>/world/ for any other), so the world clock is inherited from previous runs: without this pin the test's outcome is a function of how many runs that world dir has accumulated (green on a warm night-time world, red on a cold one). NeoForge's gametest server recreates its world on every run, so there the pin only has to hold within one run. Same vanilla clock_time definition as carpentersblocks' night.json; setup saves the previous total ticks and teardown restores them.",
+  "type": "minecraft:clock_time",
+  "clock": "minecraft:overworld",
+  "time": 18000
+}

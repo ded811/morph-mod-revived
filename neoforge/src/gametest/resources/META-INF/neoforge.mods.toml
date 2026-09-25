@@ -1,0 +1,30 @@
+# The NeoForge test mod: the server gametests shared with Fabric (from
+# common/src/gametest), registered by MorphNeoForgeGameTests, and the client
+# test driver (MorphNeoForgeClientTests, a dist = CLIENT entry class with two
+# input mixins, active only with -Dmorph.clientTest=true, which only the
+# clientGameTest run sets). Development only, never shipped. The Fabric test mod is fabric/src/gametest/resources/
+# fabric.mod.json, with the same mod id.
+modLoader = "javafml"
+loaderVersion = "[11,)"
+license = "LGPL-3.0-only"
+
+[[mods]]
+modId = "deds_morph_test"
+version = "1.0.0"
+displayName = "Morph Mod Revived GameTests"
+
+# The client test driver's two input mixins (client side only, and inert
+# unless -Dmorph.clientTest=true): held keys come from the driver, as in
+# Fabric's client gametest harness, and the window never grabs the mouse, so
+# whoever is using the machine cannot steer the camera during a run.
+[[mixins]]
+config = "deds_morph_test.mixins.json"
+
+# AFTER deds_morph: the registrar creates the test class instances in its
+# constructor, and FML constructs unordered mods in parallel.
+[[dependencies.deds_morph_test]]
+modId = "deds_morph"
+type = "required"
+versionRange = "[0,)"
+ordering = "AFTER"
+side = "BOTH"

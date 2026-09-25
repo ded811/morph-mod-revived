@@ -1,0 +1,11 @@
+{
+	"required": true,
+	"minVersion": "0.8",
+	"package": "com.deds.morph.client.mixin",
+	"client": [
+		"AvatarRendererNeoForgeMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	}
+}

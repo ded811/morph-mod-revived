@@ -1,23 +1,56 @@
 import java.util.regex.Matcher
 import java.util.regex.Pattern
 
-// Standalone build for "Morph Mod Revived".
+// Standalone build for "Morph Mod Revived" and the Ded's API it bundles.
 //
-// Two projects:
-//   :          (this one)  the mod itself   - sources in src/
-//   :deds-api               Ded's API       - sources in deds-api/
+// SPLIT LAYOUT: one mod, two mod loaders (Fabric and NeoForge). Six source
+// trees and one Gradle project per loader artefact:
 //
-// Both are LGPL-3.0-only. The mod is derived from iChun's Morph; Ded's API
-// is Ded811's own work with no code from Morph.
+//   common/             the mod's shared code, resources and server gametests
+//   fabric/             :fabric            the Fabric mod jar: entrypoints,
+//                                          fabric.mod.json, the client test
+//   neoforge/           :neoforge          the NeoForge mod jar: entrypoints,
+//                                          neoforge.mods.toml, the NeoForge-
+//                                          only mixins, the NeoForge test mod
+//   deds-api/common/    Ded's API core (the API every mod sees) and its
+//                       loader-neutral internals
+//   deds-api/fabric/    :deds-api-fabric   the Fabric backend of Ded's API,
+//                                          nested inside the Fabric mod jar
+//   deds-api/neoforge/  :deds-api-neoforge the NeoForge backend of Ded's API,
+//                                          jar-in-jar inside the NeoForge jar
+//
+// common/ and deds-api/common/ are plain shared source, NOT Gradle projects.
+// Each loader project adds them to its own source sets through
+// versionedRoot below and compiles them itself. Plain source sharing rather
+// than Architectury: Architectury's dev runtime can break the exit-code
+// gating the game-test runs here rely on, and there is no loader annotation
+// left in the shared code for its transformer to remap.
+//
+// THE RULE FOR WHAT GOES WHERE: if it names a loader API it cannot be in
+// common/ or deds-api/common/. checkLoaderNeutral below fails the build if
+// anything there does.
+//
+// Everything is LGPL-3.0-only. The mod is derived from iChun's Morph; Ded's
+// API is Ded811's own work with no code from Morph.
 //
 // Ded's API is vendored rather than pulled from a Maven repository so that a
 // fresh clone of this repository builds with nothing else set up. That also
 // makes this repository the "Corresponding Source" that GPL-3.0 section 6 -
 // incorporated by LGPL-3.0 - requires of anyone distributing a built jar.
 // See NOTICE sections 3(b) and 6.
+//
+// The root applies NO loader plugin: it only holds the Minecraft-target
+// machinery and the censuses. Loom and ModDevGradle are declared here with
+// `apply false` so that one copy of each plugin serves both of its projects
+// (they apply it without a version). Mixing the two forms - a version here
+// AND in a subproject - is at best redundant and fails outright when the two
+// versions differ; per-project declarations would also load Loom twice.
+// ModDevGradle 2.0.147 is shaded (its only dependency is gradle-idea-ext),
+// so loading it beside Loom in one classloader has nothing to conflict on.
 
 plugins {
 	id 'net.fabricmc.fabric-loom' version "${loom_version}" apply false
+	id 'net.neoforged.moddev' version "${moddev_version}" apply false
 }
 
 // ======================================================================
@@ -28,6 +61,11 @@ plugins {
 // (mc_canonical in gradle.properties); `-Pmc=<version>` builds another,
 // derived at build time from a rename table and an overlay. The toolchain
 // for each version lives in versions/mc<version>.properties.
+//
+// This block runs before any loader project is evaluated (Gradle configures
+// the root first), so everything it puts in `ext` below is a plain
+// `project.foo` by the time each loader project's build.gradle (fabric/,
+// neoforge/, deds-api/fabric/, deds-api/neoforge/) reads it.
 // ======================================================================
 
 def morphTarget = rootProject.property('mc').toString().trim()
@@ -44,7 +82,7 @@ if (!morphTargetFile.isFile()) {
 }
 def morphTargetProps = new Properties()
 morphTargetFile.withInputStream { morphTargetProps.load(it) }
-['minecraft_version', 'loader_version', 'fabric_api_version'].each { key ->
+['minecraft_version', 'loader_version', 'fabric_api_version', 'neoforge_version'].each { key ->
 	if (!morphTargetProps.getProperty(key)?.trim()) {
 		throw new GradleException("versions/mc${morphTarget}.properties is missing ${key}")
 	}
@@ -54,17 +92,37 @@ if (morphTargetProps.getProperty('minecraft_version').trim() != morphTarget) {
 			+ "${morphTargetProps.getProperty('minecraft_version').trim()}; the file name and the "
 			+ "property must agree")
 }
+// The exclusive upper bound for a "[26.3,26.4)" range, which NeoForge's
+// mods.toml needs (Fabric's "~26.3" does not): bump the last component.
+// Minecraft's versions have been <year>.<n> since 26.1.
+def morphTargetNext = {
+	def parts = morphTarget.split(/\./)
+	if (parts.length < 2 || !(parts[-1] ==~ /\d+/)) {
+		throw new GradleException("Cannot derive the next version after ${morphTarget}")
+	}
+	parts[-1] = (parts[-1].toInteger() + 1).toString()
+	parts.join('.')
+}()
 
-rootProject.ext.mc = morphTarget
-rootProject.ext.mc_is_canonical = (morphTarget == morphCanonical)
-rootProject.ext.minecraft_version = morphTarget
-rootProject.ext.loader_version = morphTargetProps.getProperty('loader_version').trim()
-rootProject.ext.fabric_api_version = morphTargetProps.getProperty('fabric_api_version').trim()
-// "~26.3": the fabric.mod.json range for this target, expanded into both
-// manifests so a jar built for one version refuses to load on the other.
-rootProject.ext.minecraft_range = "~${morphTarget}".toString()
-// 0.1.0-beta+mc26.3: the mod version and the game it is for, in one string.
-rootProject.ext.mod_version_full = "${rootProject.mod_version}+mc${morphTarget}".toString()
+// Published to EVERY project: the loader projects read them as plain
+// `project.xyz`, exactly the names the single-project build used.
+allprojects {
+	ext.mc = morphTarget
+	ext.mc_is_canonical = (morphTarget == morphCanonical)
+	ext.minecraft_version = morphTarget
+	ext.minecraft_version_next = morphTargetNext
+	ext.loader_version = morphTargetProps.getProperty('loader_version').trim()
+	ext.fabric_api_version = morphTargetProps.getProperty('fabric_api_version').trim()
+	// NeoForge for this target (e.g. 26.2.0.75). Required even for a Fabric-
+	// only task: every project is configured for any task, and a missing key
+	// is better reported here, once, than as a ModDevGradle error later.
+	ext.neoforge_version = morphTargetProps.getProperty('neoforge_version').trim()
+	// "~26.3": the fabric.mod.json range for this target, expanded into both
+	// manifests so a jar built for one version refuses to load on the other.
+	ext.minecraft_range = "~${morphTarget}".toString()
+	// 0.1.0-beta+mc26.3: the mod version and the game it is for, in one string.
+	ext.mod_version_full = "${rootProject.mod_version}+mc${morphTarget}".toString()
+}
 
 // ---- the rename table for a derived target ---------------------------
 // versions/mc<target>/renames.txt: "<canonical FQN> <target FQN>" per line.
@@ -92,10 +150,15 @@ if (morphRenameFile.isFile()) {
 // form must still match after the 'L' of a descriptor. A BARE simple name
 // (a class that was renamed, not moved - EnderMan -> Enderman in 26.3) gets
 // a guard on both sides, so it can only ever match the whole identifier.
-def morphRenamePatterns = morphRenamePairs.collect { pair ->
-	def bare = !pair[0].contains('.') && !pair[0].contains('/')
+// checkVersionedSources builds its vocabulary scan with this same closure,
+// so the scan and the rewrite can never disagree about what a name is.
+def morphRenamePattern = { String name ->
+	def bare = !name.contains('.') && !name.contains('/')
 	def front = bare ? '(?<![A-Za-z0-9_$])' : ''
-	[Pattern.compile(front + Pattern.quote(pair[0]) + '(?![A-Za-z0-9_])'), Matcher.quoteReplacement(pair[1])]
+	Pattern.compile(front + Pattern.quote(name) + '(?![A-Za-z0-9_])')
+}
+def morphRenamePatterns = morphRenamePairs.collect { pair ->
+	[morphRenamePattern(pair[0]), Matcher.quoteReplacement(pair[1])]
 }
 rootProject.ext.renameLine = { String line ->
 	def out = line
@@ -104,6 +167,14 @@ rootProject.ext.renameLine = { String line ->
 	}
 	return out
 }
+
+// Every relative root any project hands to versionedRoot, recorded as the
+// projects are configured. checkVersionedSources reads it at EXECUTION time,
+// when every project has been configured, and refuses an overlay file that
+// lives under none of them: after a tree moves, an overlay left at the old
+// path would otherwise be silently ignored (and a forgotten mixin-config
+// overlay only shows up as a crash in the client test).
+def morphVersionedRoots = [] as SortedSet
 
 /**
  * A source root as this target sees it: a LIST for java.srcDirs /
@@ -114,8 +185,13 @@ rootProject.ext.renameLine = { String line ->
  * rename table (Java files only), with every file the overlay
  * versions/mc<target>/<root> also holds taken from the overlay instead.
  * The element is a Provider carrying the task dependency.
+ *
+ * Called once per (project, root): each loader project compiles the shared
+ * roots itself and gets its own copy, which costs a second and keeps the
+ * task graph free of cross-project outputs.
  */
 rootProject.ext.versionedRoot = { Project p, String rel ->
+	morphVersionedRoots << rel
 	def base = rootProject.file(rel)
 	def overlay = rootProject.file("versions/mc${morphTarget}/${rel}")
 	if (rootProject.ext.mc_is_canonical) {
@@ -149,52 +225,12 @@ rootProject.ext.versionedRoot = { Project p, String rel ->
 	return [task.map { it.destinationDir }]
 }
 
-allprojects {
-	apply plugin: 'net.fabricmc.fabric-loom'
-	apply plugin: 'java-library'
-
-	// Ded's API carries its own version line (api_version). The mod's
-	// fabric.mod.json depends on `deds_api ">=2.0.0 <3.0.0"`, so the nested
-	// API jar MUST declare a version inside that range or Fabric Loader
-	// rejects the mod at startup.
-	version = (project.path == ':deds-api') ? rootProject.api_version : rootProject.mod_version_full
-	group = rootProject.maven_group
-
-	dependencies {
-		minecraft "com.mojang:minecraft:${rootProject.minecraft_version}"
-		implementation "net.fabricmc:fabric-loader:${rootProject.loader_version}"
-		implementation "net.fabricmc.fabric-api:fabric-api:${rootProject.fabric_api_version}"
-	}
-
-	processResources {
-		def v = project.version
-		def range = rootProject.minecraft_range
-		def mcv = rootProject.minecraft_version
-		inputs.property 'version', v
-		inputs.property 'minecraft_range', range
-		inputs.property 'minecraft_version', mcv
-		filesMatching('fabric.mod.json') {
-			expand 'version': v, 'minecraft_range': range, 'minecraft_version': mcv
-		}
-	}
-
-	tasks.withType(JavaCompile).configureEach {
-		it.options.release = 25
-		it.options.encoding = 'UTF-8'
-	}
-
-	java {
-		withSourcesJar()
-		sourceCompatibility = JavaVersion.VERSION_25
-		targetCompatibility = JavaVersion.VERSION_25
-	}
-}
-
 // GPL-3.0 sections 4-6, incorporated by LGPL-3.0: every recipient must get a
 // copy of the licence and the notices must stay intact. Put both halves of
 // the LGPL-3.0 - and the attribution/statement-of-changes NOTICE - inside
 // every jar, sources jars included, so a player who only ever sees the jar
-// still receives them.
+// still receives them. Every project, so a loader project added later is
+// covered without anyone remembering to.
 allprojects {
 	tasks.matching { it.name == 'jar' || it.name == 'sourcesJar' }.configureEach {
 		from(rootProject.rootDir) {
@@ -205,49 +241,525 @@ allprojects {
 	}
 }
 
-base {
-	archivesName = 'morph-mod-revived'
-}
+// ======================================================================
+// BUILD-TIME CENSUSES
+//
+// Facts about the layout that used to be true only by memory, checked on
+// every `build`: the Fabric and NeoForge mod projects' `check` depends on all
+// three censuses, and the two Ded's API projects' `check` on
+// checkVersionedSources and checkLoaderNeutral (checkGameTestLists concerns
+// only the Morph test mods). They live at the root because they read
+// common/ and deds-api/common/, which are plain shared source rather than
+// projects of their own. Each prints what it counted, INCLUDING what it
+// skipped: a census that silently passes over what it cannot parse hides
+// exactly the cases that later break. Each also fails when it found nothing
+// to count at all, since a census of nothing passes by construction.
+//
+// None declares outputs, so none is ever up to date: all three run, and
+// print, on every build that includes them. They read a few hundred small
+// files.
+// ======================================================================
 
-dependencies {
-	implementation project(':deds-api')
-	// Nest Ded's API inside the mod jar so players only download one file.
-	// Separately identified in NOTICE section 3.
-	include project(':deds-api')
-}
-
-fabricApi {
-	configureTests {
-		createSourceSet = true
-		modId = 'deds_morph_test'
-		enableGameTests = true
-		// `./gradlew runClientGameTest` boots a real client - the only layer
-		// that can see the morph render stack at all - and screenshots it for
-		// a human, on top of hard assertions on the two render-state fields
-		// vanilla's lie-down branch keys on. NOT part of `build`: it needs a
-		// display.
-		enableClientGameTests = true
-		eula = true
-	}
-}
-
-// The source sets, as this target sees them (identity on the canonical one).
-sourceSets {
-	main {
-		java.srcDirs = rootProject.ext.versionedRoot(project, 'src/main/java')
-		resources.srcDirs = rootProject.ext.versionedRoot(project, 'src/main/resources')
-	}
-	gametest {
-		java.srcDirs = rootProject.ext.versionedRoot(project, 'src/gametest/java')
-		resources.srcDirs = rootProject.ext.versionedRoot(project, 'src/gametest/resources')
-	}
-}
-
-project(':deds-api') {
-	sourceSets {
-		main {
-			java.srcDirs = rootProject.ext.versionedRoot(project, 'deds-api/src/main/java')
-			resources.srcDirs = rootProject.ext.versionedRoot(project, 'deds-api/src/main/resources')
+/**
+ * Java source with its comments removed and everything else - string and
+ * char literals and text blocks included - kept, line breaks too, so a line
+ * number in the result is a line number in the file. Every census matches
+ * CODE: a comment explaining a rename or naming a loader API is not a use,
+ * and a javadoc that talks about @GameTest does not make a test.
+ */
+def morphStripJavaComments = { String text ->
+	// Plain chars, compared as chars: Groovy's == between a char and a
+	// one-letter String is not something to lean on in a census.
+	final char SLASH = '/' as char
+	final char STAR = '*' as char
+	final char NL = (char) 10
+	final char DQUOTE = (char) 34
+	final char SQUOTE = (char) 39
+	final char BACKSLASH = (char) 92
+	def out = new StringBuilder(text.length())
+	int i = 0
+	int n = text.length()
+	while (i < n) {
+		char c = text.charAt(i)
+		boolean hasNext = i + 1 < n
+		if (c == SLASH && hasNext && text.charAt(i + 1) == SLASH) {
+			while (i < n && text.charAt(i) != NL) {
+				i++
+			}
+		} else if (c == SLASH && hasNext && text.charAt(i + 1) == STAR) {
+			i += 2
+			while (i < n && !(text.charAt(i) == STAR && i + 1 < n && text.charAt(i + 1) == SLASH)) {
+				if (text.charAt(i) == NL) {
+					out.append(NL)
+				}
+				i++
+			}
+			i += 2
+		} else if (c == DQUOTE && text.startsWith('"""', i)) {
+			int end = text.indexOf('"""', i + 3)
+			end = (end < 0) ? n : end + 3
+			out.append(text, i, end)
+			i = end
+		} else if (c == DQUOTE || c == SQUOTE) {
+			char quote = c
+			out.append(c)
+			i++
+			while (i < n && text.charAt(i) != quote && text.charAt(i) != NL) {
+				if (text.charAt(i) == BACKSLASH && i + 1 < n) {
+					out.append(text.charAt(i))
+					i++
+				}
+				out.append(text.charAt(i))
+				i++
+			}
+			if (i < n) {
+				out.append(text.charAt(i))
+				i++
+			}
+		} else {
+			out.append(c)
+			i++
 		}
+	}
+	return out.toString()
+}
+
+/**
+ * The versioned layout's own rules, checked:
+ *  - every version directory has its versions/mc<v>.properties beside it
+ *    and every rename line parses;
+ *  - the canonical version's overlay holds only files the shared tree does
+ *    not have (a shadowing file there would be a duplicate class, since the
+ *    canonical build compiles both directories as they are);
+ *  - every overlay file lives under a root some project really passes to
+ *    versionedRoot (an overlay at a path no build reads is silently ignored:
+ *    exactly what every overlay would have become when the trees moved).
+ *    The roots are recorded as projects are configured, so this rule needs
+ *    EVERY project configured: under configure-on-demand a `:fabric:build`
+ *    configures only the Fabric projects, and the NeoForge overlays would
+ *    look like orphans. Then the rule is skipped, and says so, and the other
+ *    rules (which read no configuration state) still run;
+ *  - no Java overlay file for a derived target still names, in CODE, a
+ *    canonical class the rename table would have rewritten. An overlay is
+ *    written in its own version's vocabulary and is never filtered, so such
+ *    a name would compile against the wrong class or not at all. The scan
+ *    uses the rename machinery's own patterns (a bare simple name guarded in
+ *    front and behind) and ignores comments, where naming the old class is
+ *    how a rename gets explained.
+ */
+tasks.register('checkVersionedSources') {
+	group = 'verification'
+	description = 'The versions/ layout obeys versions/README.md.'
+	def versionsDir = rootProject.file('versions')
+	doLast {
+		def roots = morphVersionedRoots.toList()
+		if (roots.isEmpty()) {
+			throw new GradleException("checkVersionedSources: no project called versionedRoot, "
+					+ "so there is nothing to check overlays against. Is a loader project "
+					+ "missing from settings.gradle?")
+		}
+		// Safe to read here because the configuration cache is off (see
+		// gradle.properties): every project Gradle configured has run its
+		// build script, and so its versionedRoot calls, by now.
+		def unconfigured = rootProject.subprojects.findAll { !it.state.executed }*.path.sort()
+		int orphanUnchecked = 0
+		def report = []
+		int targets = 0
+		versionsDir.listFiles().findAll { it.isDirectory() && it.name ==~ /mc.+/ }.sort().each { dir ->
+			targets++
+			def target = dir.name.substring(2)
+			def canonical = (target == morphCanonical)
+			if (!new File(versionsDir, "mc${target}.properties").isFile()) {
+				throw new GradleException("versions/${dir.name}/ has no versions/mc${target}.properties beside it")
+			}
+			def renamePatterns = [:]
+			def renameFile = new File(dir, 'renames.txt')
+			if (renameFile.isFile()) {
+				renameFile.eachLine { line ->
+					def t = line.trim()
+					if (t && !t.startsWith('#')) {
+						def parts = t.split(/\s+/)
+						if (parts.length != 2) {
+							throw new GradleException("${renameFile}: expected '<canonical> <target>', got: ${line}")
+						}
+						renamePatterns[parts[0]] = morphRenamePattern(parts[0])
+						def slashed = parts[0].replace('.', '/')
+						if (slashed != parts[0]) {
+							renamePatterns[slashed] = morphRenamePattern(slashed)
+						}
+					}
+				}
+			}
+			int overlayFiles = 0
+			int shadowing = 0
+			int added = 0
+			int javaScanned = 0
+			int skipped = 0
+			dir.eachFileRecurse { f ->
+				if (!f.isFile() || f == renameFile) {
+					return
+				}
+				def rel = dir.toPath().relativize(f.toPath()).toString().replace('\\', '/')
+				overlayFiles++
+				if (!roots.any { rel.startsWith(it + '/') }) {
+					if (!unconfigured.isEmpty()) {
+						// Probably a root of a project this build did not configure.
+						orphanUnchecked++
+					} else {
+						throw new GradleException("versions/${dir.name}/${rel} is not under any source "
+								+ "root the build reads, so no build would ever use it. The roots "
+								+ "passed to versionedRoot are: ${roots}. An overlay mirrors the path "
+								+ "of the shared file it replaces; move it there, or delete it.")
+					}
+				}
+				if (rootProject.file(rel).isFile()) {
+					if (canonical) {
+						throw new GradleException("versions/${dir.name}/${rel} shadows a shared file, but "
+								+ "${target} is the canonical version and compiles both directories as "
+								+ "they are: that is a duplicate class. Move the version-specific file "
+								+ "into the shared tree, or the shared one into every OTHER version's "
+								+ "overlay.")
+					}
+					shadowing++
+				} else {
+					added++
+				}
+				if (!f.name.endsWith('.java')) {
+					skipped++
+					return
+				}
+				javaScanned++
+				def code = morphStripJavaComments(f.getText('UTF-8'))
+				renamePatterns.each { canonicalName, pattern ->
+					if (pattern.matcher(code).find()) {
+						throw new GradleException("versions/${dir.name}/${rel} names ${canonicalName}, a "
+								+ "canonical class the rename table maps to something else on ${target}. "
+								+ "Overlay files are written in their own version's vocabulary and are "
+								+ "never filtered; use the ${target} name.")
+					}
+				}
+			}
+			report << "mc${target}${canonical ? ' (canonical)' : ''}: ${renamePatterns.size()} rename " +
+					"patterns, ${overlayFiles} overlay files (${shadowing} replacing a shared file, " +
+					"${added} own)" + (unconfigured.isEmpty() ? ", all under a versioned root" : "") +
+					"; ${javaScanned} Java files scanned for canonical names, ${skipped} non-Java " +
+					"files skipped by that scan"
+		}
+		logger.lifecycle("checkVersionedSources: canonical mc${morphCanonical}, ${roots.size()} " +
+				"versioned roots, ${targets} version director(y/ies). " +
+				(report ? report.join('; ') : 'none.'))
+		if (!unconfigured.isEmpty()) {
+			logger.lifecycle("checkVersionedSources: orphan rule SKIPPED: ${unconfigured} were not " +
+					"configured (configure-on-demand?), so their source roots are unknown; " +
+					"${orphanUnchecked} overlay file(s) under none of the known roots went " +
+					"unchecked. Run a build that configures every project to check them.")
+		}
+	}
+}
+
+/**
+ * THE RULE, checked: nothing under common/ or deds-api/common/ names
+ * net.fabricmc or net.neoforged.
+ *
+ * Shared MAIN code (common/src/main, deds-api/common/src/main and their
+ * versions/mc<v>/ overlays) has ZERO tolerance. The shared GAMETESTS
+ * (common/src/gametest and its overlays) may name exactly the two Fabric
+ * gametest API types every test class uses - on NeoForge the test mod
+ * serves those names with clean-room stubs of its own
+ * (neoforge/src/gametest/java/net/fabricmc/fabric/api/gametest/v1/) - and
+ * nothing else. The one test that probed a loader's attachment internals
+ * (MorphWave9GameTests' sync-privacy test) goes through SyncProbe, which
+ * each loader's test mod implements in its own tree.
+ *
+ * Comments are stripped first (plenty of shared javadoc says "no
+ * net.fabricmc here", which is not a use); then any fully qualified
+ * net.fabricmc / net.neoforged name in the remaining code counts, in
+ * strings too, dotted or slashed, whether imported or written out. Java and
+ * the text resource formats (json, toml, properties, txt, mcmeta) are
+ * scanned; anything else (textures, sounds) is counted as skipped.
+ *
+ * A census of nothing passes by construction, so it also FAILS when:
+ *  - a base tree is missing, or either scan found no files (the shared
+ *    tree moved and this list did not);
+ *  - a shared root some loader project compiles (a versionedRoot starting
+ *    with common/ or deds-api/common/) lies outside the trees scanned here,
+ *    so a new or moved shared root cannot slip past it.
+ */
+tasks.register('checkLoaderNeutral') {
+	group = 'verification'
+	description = 'Nothing under common/ or deds-api/common/ names a mod loader.'
+	def versionsDir = rootProject.file('versions')
+	def mainBases = ['common/src/main', 'deds-api/common/src/main']
+	def gametestBases = ['common/src/gametest']
+	def withOverlays = { List<String> rels ->
+		def dirs = []
+		rels.each { rel ->
+			dirs << rootProject.file(rel)
+			versionsDir.listFiles().findAll { it.isDirectory() && it.name ==~ /mc.+/ }.sort().each { v ->
+				dirs << new File(v, rel)
+			}
+		}
+		dirs.findAll { it.isDirectory() }
+	}
+	doLast {
+		def missingBases = (mainBases + gametestBases).findAll { !rootProject.file(it).isDirectory() }
+		if (missingBases) {
+			throw new GradleException("checkLoaderNeutral: ${missingBases} do not exist, so this census "
+					+ "would scan nothing there. The shared tree probably moved: update the base "
+					+ "lists in the root build.gradle.")
+		}
+		def mainRoots = withOverlays(mainBases)
+		def gametestRoots = withOverlays(gametestBases)
+		// Read at execution time, like checkVersionedSources: every configured
+		// project has registered its roots by now. Under configure-on-demand
+		// that is a subset, which this rule checks just as well.
+		def sharedRoots = morphVersionedRoots.findAll {
+			it.startsWith('common/') || it.startsWith('deds-api/common/')
+		}
+		def unscanned = sharedRoots.findAll { rel ->
+			def bases = rel.contains('/src/gametest/') ? gametestBases : mainBases
+			!bases.any { rel.startsWith(it + '/') }
+		}
+		if (unscanned) {
+			throw new GradleException("checkLoaderNeutral: ${unscanned} are shared source roots a loader "
+					+ "project compiles, but this census does not scan them (it scans ${mainBases} with "
+					+ "zero tolerance and ${gametestBases} with the gametest allowlist). Add them to "
+					+ "the base lists in the root build.gradle.")
+		}
+		def textExtensions = ['java', 'json', 'toml', 'properties', 'txt', 'mcmeta'] as Set
+		def loaderName = Pattern.compile('net[./](?:fabricmc|neoforged)(?:[./][A-Za-z0-9_$]+)+')
+		def gametestAllowed = [
+				'net.fabricmc.fabric.api.gametest.v1.GameTest',
+				'net.fabricmc.fabric.api.gametest.v1.CustomTestMethodInvoker',
+		] as Set
+
+		// Scans one tree; returns [scanned, skipped, skippedByExtension,
+		// allowedByName]. `allowed` decides per (file, name); anything it
+		// refuses fails the build with every offending line listed.
+		def scan = { List<File> roots, Closure<Boolean> allowed ->
+			int scanned = 0
+			int skipped = 0
+			def skippedExt = new TreeMap<String, Integer>()
+			def allowedCounts = new TreeMap<String, Integer>()
+			def violations = []
+			roots.each { root ->
+				root.eachFileRecurse { f ->
+					if (!f.isFile()) {
+						return
+					}
+					def ext = f.name.contains('.') ? f.name.substring(f.name.lastIndexOf('.') + 1) : ''
+					if (!textExtensions.contains(ext)) {
+						skipped++
+						skippedExt[ext] = (skippedExt[ext] ?: 0) + 1
+						return
+					}
+					scanned++
+					def text = f.getText('UTF-8')
+					def code = (ext == 'java') ? morphStripJavaComments(text) : text
+					def rel = rootProject.rootDir.toPath().relativize(f.toPath()).toString().replace('\\', '/')
+					code.readLines().eachWithIndex { line, idx ->
+						def m = loaderName.matcher(line)
+						while (m.find()) {
+							def name = m.group().replace('/', '.')
+							if (allowed(f, name)) {
+								allowedCounts[name] = (allowedCounts[name] ?: 0) + 1
+							} else {
+								violations << "${rel}:${idx + 1}: ${name}"
+							}
+						}
+					}
+				}
+			}
+			if (!violations.isEmpty()) {
+				throw new GradleException("checkLoaderNeutral: shared code names a mod loader. "
+						+ "common/ and deds-api/common/ are compiled by every loader project and "
+						+ "must stay loader-neutral: put loader code in the loader project (fabric/ or "
+						+ "neoforge/, or deds-api/fabric/ or deds-api/neoforge/) behind a plain interface "
+						+ "or hook.\n  " + violations.join('\n  '))
+			}
+			return [scanned, skipped, skippedExt, allowedCounts]
+		}
+
+		def main = scan(mainRoots) { File f, String name -> false }
+		def tests = scan(gametestRoots) { File f, String name ->
+			gametestAllowed.contains(name)
+		}
+		if (main[0] == 0 || tests[0] == 0) {
+			throw new GradleException("checkLoaderNeutral: scanned ${main[0]} shared main file(s) and "
+					+ "${tests[0]} shared gametest file(s); a census that scans nothing proves nothing. "
+					+ "The shared tree probably moved: update the base lists in the root build.gradle.")
+		}
+		def fmtSkipped = { Map<String, Integer> byExt ->
+			byExt ? ' (' + byExt.collect { k, v -> "${v} .${k ?: '<none>'}" }.join(', ') + ')' : ''
+		}
+		int allowedTotal = tests[3].values().sum(0) as int
+		logger.lifecycle("checkLoaderNeutral: ${sharedRoots.size()} shared source roots registered " +
+				"by loader projects, all inside the scanned trees; shared main code (${mainRoots.size()} roots incl. " +
+				"overlays): ${main[0]} files scanned, 0 loader names, ${main[1]} non-text files " +
+				"skipped${fmtSkipped(main[2])}; shared gametests (${gametestRoots.size()} roots): " +
+				"${tests[0]} files scanned, ${allowedTotal} loader names allowlisted " +
+				"${tests[3].collect { k, v -> "${k.substring(k.lastIndexOf('.') + 1)} x${v}" }}, " +
+				"0 others, ${tests[1]} non-text files skipped${fmtSkipped(tests[2])}.")
+	}
+}
+
+/**
+ * The gametest class lists, checked. Two loaders run the same shared server
+ * gametests, and each finds them its own way: Fabric reads the
+ * "fabric-gametest" entrypoint array of fabric/src/gametest/resources/
+ * fabric.mod.json; the NeoForge test mod reads
+ * common/src/gametest/resources/deds_morph_test/gametest-classes.txt (plus
+ * its own NeoForge-only list,
+ * neoforge/src/gametest/resources/deds_morph_test/gametest-classes-neoforge.txt).
+ * A test class missing from either list is not a failure anywhere: it simply
+ * never runs, and a green suite says nothing about it. So:
+ *  - the shared list must EQUAL the Fabric array, in the same order (the
+ *    NeoForge registrar registers in list order, as Fabric registers in
+ *    entrypoint order);
+ *  - every class under common/src/gametest/java (and its versions/ overlays)
+ *    with a @GameTest method must be in the shared list, and every listed
+ *    class must exist there AND declare at least one @GameTest method in the
+ *    file each Minecraft version compiles (its overlay if that version has
+ *    one, the base file otherwise): a listed class whose tests stopped being
+ *    seen would otherwise register nothing on either loader, silently;
+ *  - the same two rules for neoforge/src/gametest/java and the NeoForge-only
+ *    list, which must not repeat a shared class (it would register twice).
+ *
+ * List files hold one fully qualified class name per line; blank lines and
+ * lines starting with '#' are ignored (the registrar reads them the same
+ * way). @GameTest is matched in comment-stripped code, so a javadoc that
+ * talks about the annotation does not make a class a test class.
+ */
+tasks.register('checkGameTestLists') {
+	group = 'verification'
+	description = 'Every gametest class is in the list each loader registers from.'
+	def sharedList = rootProject.file('common/src/gametest/resources/deds_morph_test/gametest-classes.txt')
+	def neoforgeList = rootProject.file('neoforge/src/gametest/resources/deds_morph_test/gametest-classes-neoforge.txt')
+	def fabricModJson = rootProject.file('fabric/src/gametest/resources/fabric.mod.json')
+	def versionsDir = rootProject.file('versions')
+	inputs.files(sharedList, neoforgeList, fabricModJson).withPropertyName('lists')
+	doLast {
+		def readList = { File f ->
+			if (!f.isFile()) {
+				throw new GradleException("checkGameTestLists: ${f} is missing")
+			}
+			def names = f.readLines('UTF-8').collect { it.trim() }.findAll { it && !it.startsWith('#') }
+			def dupes = names.countBy { it }.findAll { it.value > 1 }.keySet()
+			if (dupes) {
+				throw new GradleException("checkGameTestLists: ${f} lists ${dupes} more than once")
+			}
+			return names
+		}
+		// Every Minecraft target (versions/mc<v>.properties), for the
+		// per-version counts below.
+		def targets = versionsDir.listFiles()
+				.findAll { it.isFile() && it.name ==~ /mc.+\.properties/ }
+				.collect { it.name.replaceAll(/^mc|\.properties$/, '') }
+				.sort()
+		if (targets.isEmpty()) {
+			throw new GradleException("checkGameTestLists: no versions/mc<version>.properties found")
+		}
+		// FQN -> (target -> @GameTest count in the file that target compiles):
+		// its overlay versions/mc<target>/<rel>/... when it has one, else the
+		// base file. A target with neither has no entry for the class.
+		def gameTestPattern = Pattern.compile('(?<![A-Za-z0-9_.$])@GameTest(?![A-Za-z0-9_$])')
+		def census = { String rel ->
+			def base = rootProject.file(rel)
+			def countIn = { File f ->
+				def m = gameTestPattern.matcher(morphStripJavaComments(f.getText('UTF-8')))
+				int count = 0
+				while (m.find()) {
+					count++
+				}
+				count
+			}
+			// relative path -> file, under one root
+			def filesUnder = { File root ->
+				def files = [:]
+				if (root.isDirectory()) {
+					root.eachFileRecurse { f ->
+						if (f.isFile()) {
+							files[root.toPath().relativize(f.toPath()).toString().replace('\\', '/')] = f
+						}
+					}
+				}
+				files
+			}
+			def baseFiles = filesUnder(base)
+			def overlayFiles = targets.collectEntries { t -> [(t): filesUnder(new File(versionsDir, "mc${t}/${rel}"))] }
+			def allPaths = new TreeSet<String>(baseFiles.keySet())
+			overlayFiles.values().each { allPaths.addAll(it.keySet()) }
+			def found = new TreeMap<String, Map<String, Integer>>()
+			int scanned = 0
+			int skipped = 0
+			allPaths.each { path ->
+				if (!path.endsWith('.java')) {
+					skipped++
+					return
+				}
+				scanned++
+				def fqn = path.replaceAll(/\.java$/, '').replace('/', '.')
+				def perTarget = new TreeMap<String, Integer>()
+				targets.each { t ->
+					File f = overlayFiles[t][path] ?: baseFiles[path]
+					if (f != null) {
+						perTarget[t] = countIn(f)
+					}
+				}
+				found[fqn] = perTarget
+			}
+			return [found, scanned, skipped]
+		}
+		def check = { String what, List<String> listed, String rel ->
+			def (found, scanned, skipped) = census(rel)
+			def missingSources = listed.findAll { !found.containsKey(it) || found[it].isEmpty() }
+			if (missingSources) {
+				throw new GradleException("checkGameTestLists: the ${what} list names ${missingSources}, "
+						+ "which have no source file under ${rel} (or its versions/ overlays)")
+			}
+			def empty = listed.findAll { name -> found[name].values().any { it == 0 } }
+			if (empty) {
+				throw new GradleException("checkGameTestLists: ${empty.collect { "${it} ${found[it]}" }} "
+						+ "are in the ${what} list but declare no @GameTest methods for some Minecraft "
+						+ "version (counts per version shown), so that version would register nothing "
+						+ "from them. Fix the class, or take it out of the list.")
+			}
+			def testClasses = found.findAll { entry -> entry.value.values().any { it > 0 } }.keySet()
+			def unlisted = testClasses.findAll { !listed.contains(it) }
+			if (unlisted) {
+				throw new GradleException("checkGameTestLists: ${unlisted} under ${rel} declare @GameTest "
+						+ "methods but are not in the ${what} list, so no loader would ever run them")
+			}
+			def perTarget = targets.collectEntries { t -> [(t): listed.sum(0) { found[it][t] ?: 0 } as int] }
+			def methods = perTarget.values().toSet().size() == 1
+					? "${perTarget.values().first()} @GameTest methods on each of ${targets}"
+					: "@GameTest methods per version ${perTarget}"
+			return "${what}: ${listed.size()} classes, every one with tests, ${methods} " +
+					"(${scanned} Java files scanned, ${skipped} other files skipped)"
+		}
+
+		def shared = readList(sharedList)
+		if (shared.isEmpty()) {
+			throw new GradleException("checkGameTestLists: ${sharedList} lists no classes")
+		}
+		def fabricList = new groovy.json.JsonSlurper().parse(fabricModJson, 'UTF-8')
+				.entrypoints?.get('fabric-gametest') ?: []
+		if (fabricList != shared) {
+			throw new GradleException("checkGameTestLists: the shared gametest list and the Fabric test "
+					+ "mod's \"fabric-gametest\" entrypoints differ (they must be equal, in the same "
+					+ "order).\n  gametest-classes.txt: ${shared}\n  fabric.mod.json:      ${fabricList}")
+		}
+		def neoforgeOnly = readList(neoforgeList)
+		def overlap = neoforgeOnly.findAll { shared.contains(it) }
+		if (overlap) {
+			throw new GradleException("checkGameTestLists: ${overlap} are in both the shared and the "
+					+ "NeoForge-only list; the NeoForge registrar would register them twice")
+		}
+		def report = [
+				check('shared', shared, 'common/src/gametest/java'),
+				check('NeoForge-only', neoforgeOnly, 'neoforge/src/gametest/java'),
+		]
+		logger.lifecycle("checkGameTestLists: shared list == Fabric \"fabric-gametest\" " +
+				"(${shared.size()} entries, same order); " + report.join('; ') + '.')
 	}
 }

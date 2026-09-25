@@ -1,5 +1,51 @@
 # Changelog
 
+## 0.2.0-beta
+
+**Morph Mod Revived now runs on NeoForge too**, for **Minecraft 26.2 and 26.3**,
+with the same features as on Fabric: the same morphs, abilities, selector,
+favourites wheel, commands and settings.
+
+**Pick the jar for your loader and your Minecraft version:**
+
+| | Minecraft 26.2 | Minecraft 26.3 |
+| --- | --- | --- |
+| Fabric | `morph-mod-revived-fabric-0.2.0-beta+mc26.2.jar` | `morph-mod-revived-fabric-0.2.0-beta+mc26.3.jar` |
+| NeoForge | `morph-mod-revived-neoforge-0.2.0-beta+mc26.2.jar` | `morph-mod-revived-neoforge-0.2.0-beta+mc26.3.jar` |
+
+Each one only loads on the loader and the version in its name.
+
+**You need:**
+
+- On Fabric: Fabric Loader 0.19.3 or newer for 26.2, or 0.19.5 or newer for
+  26.3, and Fabric API
+- On NeoForge: NeoForge for your Minecraft version (tested with 26.2.0.75,
+  26.2.0.88, 26.3.0.7-beta and 26.3.0.16-beta). Fabric API isn't needed.
+- Java 25 or newer
+
+Ded's API is still bundled inside the mod jar, so there's nothing else to
+download. On a server, install the mod on the server and on every player's
+game, with the same loader on both.
+
+**Two things work differently on NeoForge:**
+
+- **A world keeps its morphs on one loader only.** Fabric and NeoForge save
+  morph collections in different places, so a world moved from Fabric to
+  NeoForge, or back, loses everyone's collection.
+- **A player running NeoForge without the mod can't join a server that has
+  it.** On Fabric they can join, but they don't see any of the mod. With the
+  mod installed, you can still join servers that don't have it, on both
+  loaders.
+
+**Nothing changed for Fabric players** apart from the mod's description text.
+Your collections and settings carry over from 0.1.0-beta as they are.
+
+Please report bugs on the
+[issue tracker](https://github.com/ded811/morph-mod-revived/issues).
+
+**Source code:** <https://github.com/ded811/morph-mod-revived>, under the
+LGPL-3.0, the same licence as the original.
+
 ## 0.1.0-beta
 
 The first release, for **Minecraft 26.2 and 26.3** on **Fabric**.

@@ -3,7 +3,8 @@
 **Kill a mob, become the mob.**
 
 An unofficial revival of **iChun's Morph**, based on its classic Minecraft 1.6.4
-version and rebuilt for **Minecraft 26.2 and 26.3** on **Fabric**.
+version and rebuilt for **Minecraft 26.2 and 26.3** on **Fabric** and
+**NeoForge**.
 
 The mobs you kill join your collection. Your body twists into their shape while
 everyone nearby watches, and you take on their size and their natural
@@ -12,8 +13,8 @@ underwater. Your health and attack stay your own, though, and there are no mob
 attacks to use, like creeper explosions or blaze fireballs. Switch between your
 collected forms whenever you like, or go back to being yourself.
 
-- **Needs** Fabric Loader and [Fabric API](https://modrinth.com/mod/fabric-api).
-  Fabric only.
+- **Needs** Fabric Loader and [Fabric API](https://modrinth.com/mod/fabric-api),
+  or NeoForge. There's a separate file for each loader.
 - **Multiplayer:** install it on the server and on every player's game.
 - **Beta:** it's playable, but it isn't finished, and it isn't an exact copy of
   the original. Please report bugs on the
@@ -160,25 +161,35 @@ A few more things that come with the body:
 - **Don't open your world without the mod installed.** The game throws away
   data from mods it doesn't have, so your collection may be lost the next time
   it saves.
+- **Keep a world on one loader.** Fabric and NeoForge each save morph
+  collections in their own way, so if you move a world from one to the other,
+  everyone's collection is gone there.
+- **NeoForge players need the mod to join.** A player running NeoForge without
+  the mod can't join a server that has it. On Fabric they can join, but they
+  won't see any of the mod.
 - **It hasn't been tested alongside many other mods yet.** If it clashes with
   one, please report it.
 
 ## What you need
 
 - Minecraft **26.2** or **26.3**
-- [Fabric Loader](https://fabricmc.net/use/) 0.19.3 or newer (on 26.3 it has
-  been tested with 0.19.5, so use that or newer there)
-- [Fabric API](https://modrinth.com/mod/fabric-api)
 - Java 25 or newer
+- **On Fabric:** [Fabric Loader](https://fabricmc.net/use/) 0.19.3 or newer (on
+  26.3 it has been tested with 0.19.5, so use that or newer there), and
+  [Fabric API](https://modrinth.com/mod/fabric-api)
+- **On NeoForge:** NeoForge for your Minecraft version (tested with 26.2.0.75
+  and 26.2.0.88, 26.3.0.7-beta and 26.3.0.16-beta). You don't need Fabric API.
 
-If you download by hand, pick the file for your Minecraft version: its name
-ends in `+mc26.2` or `+mc26.3`, and each one only works on that version. You
-might see **Ded's API** in your mod list: it comes inside this mod, so you don't
-need to download it separately.
+If you download by hand, pick the file for your loader and your Minecraft
+version: `morph-mod-revived-fabric-...` is for Fabric and
+`morph-mod-revived-neoforge-...` is for NeoForge, and the name ends in
+`+mc26.2` or `+mc26.3`. Each file only works on that loader and that version.
+You might see **Ded's API** in your mod list: it comes inside this mod, so you
+don't need to download it separately.
 
-On a server, install the mod on the server **and** on every player's game. In
-singleplayer, just put it in your mods folder. For LAN games, everyone who joins
-needs it too.
+On a server, install the mod on the server **and** on every player's game, with
+the same loader on both. In singleplayer, just put it in your mods folder. For
+LAN games, everyone who joins needs it too.
 
 ## Commands
 

@@ -15,3 +15,4 @@ NOTICE          -text
 *.png           binary
 *.ogg           binary
 *.jar           binary
+*.nbt           binary

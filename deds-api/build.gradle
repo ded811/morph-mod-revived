@@ -1,5 +1,0 @@
-// Ded's API - LGPL-3.0-only, copyright (C) 2026 Ded811. See ../LICENSE,
-// ../LICENSE.GPL and ../NOTICE section 3b. Contains no code derived from Morph.
-base {
-	archivesName = 'deds-api'
-}

@@ -1,5 +1,5 @@
 ================================================================================
-NOTICE — Morph Mod Revived
+NOTICE: Morph Mod Revived
 Attribution, statement of changes, and the licences inside this repo
 ================================================================================
 
@@ -14,7 +14,7 @@ affiliated with iChun.
 Original mod:   Morph (a.k.a. Metamorph / "Morph Beta")
 Original author: iChun
 Upstream source: https://github.com/iChun/Morph
-Branch read:     legacy  — the 1.6 line, opened by the commit "Revert to 1.6
+Branch read:     legacy  (the 1.6 line), opened by the commit "Revert to 1.6
                  build. Push latest ModMobSupport.json. Legacy build…"
                  (2014-03-10)
 Commit read:     fbf511c41ee89058a78f60d1cd07fefbdbd84538 ("Remove dupes.",
@@ -22,7 +22,7 @@ Commit read:     fbf511c41ee89058a78f60d1cd07fefbdbd84538 ("Remove dupes.",
 Version:         the branch declares
                  `public static final String version = "0.7.0";`
                  (morph/common/Morph.java:58). The build this port actually
-                 studied is Morph Beta 0.7.1, the last 1.6.4 release — see
+                 studied is Morph Beta 0.7.1, the last 1.6.4 release; see
                  section 5(i), where that one-patch gap is written out.
 Upstream licence: GNU Lesser General Public License, Version 3, 29 June 2007.
                  The branch root carries the standard FSF pair: `COPYING`
@@ -33,17 +33,19 @@ Upstream licence: GNU Lesser General Public License, Version 3, 29 June 2007.
 
 There is no "or later" grant anywhere in the tree, and the source files carry
 no per-file licence headers and no per-file copyright headers (checked
-`morph/common/Morph.java` and `morph/common/core/EventHandler.java` — both
+`morph/common/Morph.java` and `morph/common/core/EventHandler.java`; both
 begin at `package`). The repository-root `COPYING` / `COPYING.LESSER` pair is
 the only licence statement upstream makes, and iChun's authorship is the only
 authorship statement. Both are preserved here: the licence text as `LICENSE`
 and `LICENSE.GPL` (see section 3), and the authorship credit in this file, in
-`README.md`, and in the mod's `fabric.mod.json` `contributors` field.
+`README.md`, and in the mod's metadata: the `contributors` field of
+`fabric.mod.json` in the Fabric jar, and the `credits` field of
+`neoforge.mods.toml` in the NeoForge jar.
 
 The original also required **iChunUtil** (version 2.4.0 for this line). No
 iChunUtil code and no iChunUtil asset is present in this repository; that
-mod's role is filled by Ded's API, which is this project's own work — see
-section 3(b).
+mod's role is filled by Ded's API, which is this project's own work (see
+section 3(b)).
 
 Morph won ModJam 2 (2013) and stayed in "beta" for the whole of its 1.6.4
 life. It is iChun's idea and iChun's design, from the first line to the last.
@@ -58,18 +60,29 @@ it.
 
 WHAT CHANGED, and WHEN:
 
-  * July 2026 — the mod was rewritten for **Minecraft 26.2 on the Fabric mod
+  * July 2026: the mod was rewritten for **Minecraft 26.2 on the Fabric mod
     loader**. The original targets Minecraft 1.6.4 on Minecraft Forge. No
     upstream source file survives verbatim: the original's Forge-era classes
     (`morph.*`) have no counterpart in modern Minecraft, so every source file
     in this repository is newly written. The artwork and sounds are the
     exception; see below and section 4.
 
-  * September 2026 — the same sources also build for **Minecraft 26.3** on
+  * September 2026: the same sources also build for **Minecraft 26.3** on
     Fabric. A per-version build layer (`versions/`, see `versions/README.md`)
     derives the 26.3 jar from the 26.2 sources; the handful of calls whose
     shape differs between the two versions are isolated in small
     per-version classes.
+
+  * September 2026: the mod and Ded's API also run on the **NeoForge mod
+    loader**, for Minecraft 26.2 and 26.3, built from the same sources. To
+    make that possible the repository was restructured: the mod's shared
+    code, resources and assets moved from `src/` to `common/`, the code and
+    metadata for each mod loader live in `fabric/` and `neoforge/`, and Ded's
+    API is split the same way into `deds-api/common/`, `deds-api/fabric/`
+    and `deds-api/neoforge/`. Where NeoForge changes vanilla Minecraft
+    behaviour the mod relies on (how far villagers keep from a mob, how
+    shears work on a mob, and when a turtle helmet gives water breathing),
+    the NeoForge build is adjusted so the mod behaves as it does on Fabric.
 
   * What is DERIVED from the original, and is therefore covered by LGPL-3.0,
     is the substance rather than the text: the morph identity model (entity
@@ -85,11 +98,11 @@ WHAT CHANGED, and WHEN:
     options with their defaults. These were transcribed from the upstream
     source named in section 1 and from a decompile of the released 0.7.1 jar.
 
-  * One user-visible string is reproduced verbatim — the refusal message
-    "You may not rest now, you are in morph" — because for a message the
+  * One user-visible string is reproduced verbatim, the refusal message
+    "You may not rest now, you are in morph", because for a message the
     wording *is* the behaviour. Everything else was re-expressed.
 
-  * The artwork and the sounds are iChun's, reused unmodified — see section 4.
+  * The artwork and the sounds are iChun's, reused unmodified (see section 4).
 
   * The port DEVIATES from the original in a number of places, deliberately
     and on the record. Among them: an unloadable morph stays dormant instead
@@ -132,9 +145,9 @@ holds the copyright, and whether iChun's work is in it.
 The LGPL-3.0 is written as a set of additional permissions on top of the GNU
 GPL version 3, so it is TWO documents and both ship here:
 
-    LICENSE      — GNU Lesser General Public License, Version 3
+    LICENSE      : GNU Lesser General Public License, Version 3
                    (upstream calls this file `COPYING.LESSER`)
-    LICENSE.GPL  — GNU General Public License, Version 3
+    LICENSE.GPL  : GNU General Public License, Version 3
                    (upstream calls this file `COPYING`)
 
 Both are the Free Software Foundation's current texts. They are the same
@@ -142,8 +155,12 @@ documents iChun ships, character for character, except that the FSF has since
 changed one URL in the copyright line from `http://fsf.org/` to
 `https://fsf.org/`.
 
-  (a) The mod  —  `src/` (everything: the mod's Java, resources and assets),
-      and the per-version copies of its files under `versions/mc<version>/src/`
+  (a) The mod:  `common/` (the mod's shared Java, resources and assets),
+      `fabric/` and `neoforge/` (the code and metadata for each mod loader,
+      and each loader's test mod), apart from the build scripts listed in
+      (c), and the per-version copies of their files under
+      `versions/mc<version>/common/`, `versions/mc<version>/fabric/` and
+      `versions/mc<version>/neoforge/`
 
       This is the derivative work described in section 2, under the same
       licence as the original.
@@ -151,16 +168,27 @@ changed one URL in the copyright line from `http://fsf.org/` to
       Copyright (C) 2013-2014 iChun     (the original work)
       Copyright (C) 2026 Ded811         (the modifications and the port)
 
-      NOTE ON SCOPE: a handful of files under `src/` — the ~3-line Fabric
-      loader entrypoints and the glue that calls into Ded's API — are original
-      work of this project and owe nothing to the upstream mod. They are NOT
-      carved out, deliberately: they are too small and too entangled with the
-      derived code to be worth splitting, so the whole of `src/` is treated as
-      part of the derivative work. The reusable parts live in Ded's API
-      instead (b), which carries none of iChun's work.
+      NOTE ON SCOPE: some files under `fabric/` and `neoforge/` (the Fabric
+      and NeoForge loader entrypoints, the loader-specific mixins, and the
+      glue that calls into Ded's API) are original work of this project and
+      owe nothing to the upstream mod. The same holds for two test-only parts
+      of the NeoForge test mod, which are never shipped in a jar: the
+      stand-ins in
+      `neoforge/src/gametest/java/net/fabricmc/fabric/api/gametest/v1/`,
+      which were written for this project and reproduce only the names,
+      signatures and defaults of the two Fabric API gametest types the shared
+      tests use (they contain no Fabric API code), and the empty test
+      structure `empty.nbt`, which `neoforge/tools/gen_empty_structure.py`
+      generates. None of these is carved out, deliberately: they are too
+      small and too entangled with the derived code to be worth splitting,
+      so the whole of (a) is treated as part of the derivative work. The
+      reusable parts live in Ded's API instead (b), which carries none of
+      iChun's work.
 
-  (b) Ded's API  —  `deds-api/`, and the per-version copies of its files under
-      `versions/mc<version>/deds-api/`
+  (b) Ded's API:  `deds-api/` (its core in `deds-api/common/`, and its Fabric
+      and NeoForge backends in `deds-api/fabric/` and `deds-api/neoforge/`),
+      apart from the build scripts listed in (c), and the per-version copies
+      of its files under `versions/mc<version>/deds-api/`
 
       Ded's API is an independent shared library written for this project. It
       contains no code derived from Morph and no code derived from iChunUtil.
@@ -182,12 +210,14 @@ changed one URL in the copyright line from `http://fsf.org/` to
       under MIT stay under MIT for anyone who has or gets one; this copy, and
       any copy made from it, is LGPL-3.0-only.
 
-  (c) Everything else  —  the Gradle build scripts (`build.gradle`,
-      `settings.gradle`, `deds-api/build.gradle`, `gradle.properties`; not
-      the Gradle wrapper), the rest of `versions/`
-      (per-version properties, rename tables, `versions/README.md`), this
-      NOTICE, `README.md`, `CHANGELOG.md`, `PUBLISHING.md`,
-      `docs/MODRINTH.md`, `.gitignore` and `.gitattributes`.
+  (c) Everything else:  the Gradle build scripts (`build.gradle`,
+      `settings.gradle`, `gradle.properties`, `fabric/build.gradle`,
+      `neoforge/build.gradle`, `deds-api/fabric/build.gradle` and
+      `deds-api/neoforge/build.gradle`; not the Gradle wrapper), the rest of
+      `versions/` (per-version properties, rename tables,
+      `versions/README.md`), this NOTICE, `README.md`, `CHANGELOG.md`,
+      `PUBLISHING.md`, `docs/MODRINTH.md`, `docs/NEOFORGE.md`, `.gitignore`
+      and `.gitattributes`.
 
       Copyright (C) 2026 Ded811
 
@@ -199,7 +229,7 @@ changed one URL in the copyright line from `http://fsf.org/` to
 This repository ships 17 PNG textures and 6 OGG sounds that are iChun's
 original artwork and original audio. They are reused unmodified.
 
-The one other image, the mod's icon (`src/main/resources/assets/deds_morph/icon.png`,
+The one other image, the mod's icon (`common/src/main/resources/assets/deds_morph/icon.png`,
 and `docs/icon.png` / `docs/icon_no_background.png`), is NOT iChun's: it was
 made by Ded811 for this revival (2026). The grass block in its middle is
 Minecraft's own texture, copyright Mojang, used as mods customarily do; that
@@ -208,8 +238,8 @@ section 3. The rest of the icon is Ded811's work under the LGPL-3.0.
 
 WHAT WAS MEASURED (2026-07-30):
 
-  * All 23 of iChun's shipped asset files are byte-identical — verified by SHA-256, file
-    by file — to files under `assets/morph/` in the upstream `legacy` branch
+  * All 23 of iChun's shipped asset files are byte-identical (verified by SHA-256, file
+    by file) to files under `assets/morph/` in the upstream `legacy` branch
     tree at commit `fbf511c`: the four selector-GUI textures
     (`fav`, `guiSelected`, `guiUnselected`, `guiUnselectedSide`), the twelve
     ability icons, `morphskin.png`, and `morph1.ogg` … `morph6.ogg`. Only file
@@ -230,8 +260,8 @@ THE POSITION TAKEN, and its limits:
   that basis.
 
   It is a reading, not a proof, and the honest counter-argument is recorded
-  here rather than hidden: the LGPL is written for software libraries — it
-  speaks of linking, object code and Corresponding Source — so applying it to
+  here rather than hidden: the LGPL is written for software libraries (it
+  speaks of linking, object code and Corresponding Source), so applying it to
   PNG and OGG files is legally awkward. The upstream repository nowhere states
   that the artwork and audio are covered, and authors do not always intend a
   code licence to reach their art.
@@ -248,8 +278,8 @@ THE POSITION TAKEN, and its limits:
 --------------------------------------------------------------------------------
 
   (i) THE ONE-PATCH GAP. The published `legacy` branch declares version
-      **0.7.0**. This port was derived from **0.7.1** — the newest 1.6.4 build
-      iChun released, and the one the 2014 modpack shipped — via a decompile
+      **0.7.0**. This port was derived from **0.7.1** (the newest 1.6.4 build
+      iChun released, and the one the 2014 modpack shipped) via a decompile
       (48 `.java` files, against the branch's 41). The overwhelming majority
       of what was derived (the identity model, the twelve abilities, the
       transition rules, the command tree, the config defaults, player morphs)
@@ -282,15 +312,15 @@ modify and redistribute this work.
 6. IF YOU REDISTRIBUTE THIS MOD
 --------------------------------------------------------------------------------
 
-The LGPL asks little, but it does ask. If you hand anyone a built jar — a
-release page, a modpack, a link to a friend — you must:
+The LGPL asks little, but it does ask. If you hand anyone a built jar (a
+release page, a modpack, a link to a friend), you must:
 
   * include `LICENSE` and `LICENSE.GPL` (the two halves of the LGPL-3.0 text);
   * keep iChun credited as the original author, and keep the notices in this
     file intact;
   * make clear that your copy is modified, and give a date, if you modified
     it (GPL-3.0 section 5a);
-  * make the Corresponding Source available to whoever you gave the jar to —
+  * make the Corresponding Source available to whoever you gave the jar to,
     in the same download, or with a clear note next to the jar saying where to
     get it (GPL-3.0 section 6d). For an unchanged jar, a link to this
     repository at the matching release is enough (you stay responsible if
