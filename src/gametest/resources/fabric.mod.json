@@ -1,0 +1,30 @@
+{
+	"schemaVersion": 1,
+	"id": "deds_morph_test",
+	"version": "1.0.0",
+	"name": "Morph Mod Revived GameTests",
+	"environment": "*",
+	"entrypoints": {
+		"fabric-gametest": [
+			"com.deds.morph.gametest.MorphGameTests",
+			"com.deds.morph.gametest.MorphWave2GameTests",
+			"com.deds.morph.gametest.MorphVariantGameTests",
+			"com.deds.morph.gametest.MorphAbilityGameTests",
+			"com.deds.morph.gametest.MorphEffectGameTests",
+			"com.deds.morph.gametest.MorphInteractionGameTests",
+			"com.deds.morph.gametest.MorphAiGameTests",
+			"com.deds.morph.gametest.MorphWave4GameTests",
+			"com.deds.morph.gametest.MorphWave5GameTests",
+			"com.deds.morph.gametest.MorphWave6GameTests",
+			"com.deds.morph.gametest.MorphWave8GameTests",
+			"com.deds.morph.gametest.MorphWave9GameTests",
+			"com.deds.morph.gametest.MorphWave10GameTests"
+		],
+		"fabric-client-gametest": [
+			"com.deds.morph.gametest.client.MorphRenderClientTest"
+		]
+	},
+	"depends": {
+		"deds_morph": "*"
+	}
+}

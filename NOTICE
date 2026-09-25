@@ -1,0 +1,258 @@
+================================================================================
+NOTICE — Morph Mod Revived
+Attribution, statement of changes, and the licence boundary inside this repo
+================================================================================
+
+This project is an UNOFFICIAL fan revival. It is not made by, endorsed by, or
+affiliated with iChun.
+
+
+--------------------------------------------------------------------------------
+1. THE ORIGINAL WORK
+--------------------------------------------------------------------------------
+
+Original mod:   Morph (a.k.a. Metamorph / "Morph Beta")
+Original author: iChun
+Upstream source: https://github.com/iChun/Morph
+Branch read:     legacy  — the 1.6 line, opened by the commit "Revert to 1.6
+                 build. Push latest ModMobSupport.json. Legacy build…"
+                 (2014-03-10)
+Commit read:     fbf511c41ee89058a78f60d1cd07fefbdbd84538 ("Remove dupes.",
+                 the branch tip, 2014-06-30)
+Version:         the branch declares
+                 `public static final String version = "0.7.0";`
+                 (morph/common/Morph.java:58). The build this port actually
+                 studied is Morph Beta 0.7.1, the last 1.6.4 release — see
+                 section 5(i), where that one-patch gap is written out.
+Upstream licence: GNU Lesser General Public License, Version 3, 29 June 2007.
+                 The branch root carries the standard FSF pair: `COPYING`
+                 (GNU GPL v3) and `COPYING.LESSER` (GNU LGPL v3, 7,651 bytes,
+                 opening verbatim "GNU LESSER GENERAL PUBLIC LICENSE /
+                 Version 3, 29 June 2007"). GitHub reports "LGPL-3.0, GPL-3.0
+                 licenses found" for the repository.
+
+There is no "or later" grant anywhere in the tree, and the source files carry
+no per-file licence headers and no per-file copyright headers (checked
+`morph/common/Morph.java` and `morph/common/core/EventHandler.java` — both
+begin at `package`). The repository-root `COPYING` / `COPYING.LESSER` pair is
+the only licence statement upstream makes, and iChun's authorship is the only
+authorship statement. Both are preserved here: the licence text as `LICENSE`
+and `LICENSE.GPL` (see section 3), and the authorship credit in this file, in
+`README.md`, and in the mod's `fabric.mod.json` `contributors` field.
+
+The original also required **iChunUtil** (version 2.4.0 for this line). No
+iChunUtil code and no iChunUtil asset is present in this repository; that
+mod's role is filled by Ded's API, which is this project's own work — see
+section 3(b).
+
+Morph won ModJam 2 (2013) and stayed in "beta" for the whole of its 1.6.4
+life. It is iChun's idea and iChun's design, from the first line to the last.
+
+
+--------------------------------------------------------------------------------
+2. STATEMENT OF CHANGES  (GNU GPL-3.0 section 5a, incorporated by LGPL-3.0)
+--------------------------------------------------------------------------------
+
+This is a MODIFIED work. It is not iChun's Morph and must not be mistaken for
+it.
+
+WHAT CHANGED, and WHEN:
+
+  * July 2026 — the mod was rewritten for **Minecraft 26.2 on the Fabric mod
+    loader**. The original targets Minecraft 1.6.4 on Minecraft Forge. No
+    upstream source file survives verbatim: the original's Forge-era classes
+    (`morph.*`) have no counterpart in modern Minecraft, so every file in this
+    repository is newly written.
+
+  * September 2026 — the same sources also build for **Minecraft 26.3** on
+    Fabric. A per-version build layer (`versions/`, see `versions/README.md`)
+    derives the 26.3 jar from the 26.2 sources; the handful of calls whose
+    shape differs between the two versions are isolated in small
+    per-version classes.
+
+  * What is DERIVED from the original, and is therefore covered by LGPL-3.0,
+    is the substance rather than the text: the morph identity model (entity
+    type plus normalised variant NBT) and its "same identity replaces in
+    place / new variant appends" acquisition rule, the ~4-second transition
+    and the three morph rules that guard it, the twelve passive abilities and
+    their per-player tick/apply/kill lifecycle, the hostile target-cancel
+    modes, the hitbox / eye-height / camera adoption, player morphs and their
+    per-username selector grouping, the four selector sort modes and the
+    selector's scroll cadence, the ability-icon set, the `/morph` command
+    tree, the hurt-sound swap, the flight-exhaustion arithmetic, the
+    demorph-on-death modes, the volatile-NBT strip, and the configuration
+    options with their defaults. These were transcribed from the upstream
+    source named in section 1 and from a decompile of the released 0.7.1 jar.
+
+  * One user-visible string is reproduced verbatim — the refusal message
+    "You may not rest now, you are in morph" — because for a message the
+    wording *is* the behaviour. Everything else was re-expressed.
+
+  * The artwork and the sounds are iChun's, reused unmodified — see section 4.
+
+  * The port DEVIATES from the original in a number of places, deliberately
+    and on the record. Among them: an unloadable morph stays dormant instead
+    of silently becoming a Pig; the original's `morph_backup.dat` rotation is
+    not reproduced (the modern save path makes it unnecessary); the hardcoded
+    per-mob-class ability table is replaced by generic derivation from the
+    entity's own properties, so modded mobs behave sensibly without a support
+    file; the original API's reflection trampoline is not reproduced; the
+    `canSleepMorphed` default is flipped; and re-acquiring a morph you already
+    own deliberately does not refresh it in place. Behaviour, appearance and
+    configuration therefore do not match the original one-for-one. This is a
+    revival, not a faithful reproduction.
+
+  * Development of this port is ongoing; it has not reached a 1.0 release.
+
+
+--------------------------------------------------------------------------------
+3. LICENCE BOUNDARY INSIDE THIS REPOSITORY
+--------------------------------------------------------------------------------
+
+Two licences apply, to two clearly separated directories.
+
+  (a) LGPL-3.0  —  `src/` (everything: the mod's Java, resources and assets)
+
+      This is the derivative work described in section 2. It is licensed under
+      the GNU Lesser General Public License version 3, the same licence as the
+      original.
+
+      The LGPL-3.0 is written as a set of additional permissions on top of the
+      GNU GPL version 3, so it is TWO documents and both ship here:
+
+          LICENSE      — GNU Lesser General Public License, Version 3
+                         (upstream calls this file `COPYING.LESSER`)
+          LICENSE.GPL  — GNU General Public License, Version 3
+                         (upstream calls this file `COPYING`)
+
+      Both are the Free Software Foundation's current texts. They are the same
+      documents iChun ships, character for character, except that the FSF has
+      since changed one URL in the copyright line from `http://fsf.org/` to
+      `https://fsf.org/`.
+
+      Copyright (C) 2013-2014 iChun     (the original work)
+      Copyright (C) 2026 Ded811         (the modifications and the port)
+
+      NOTE ON SCOPE: a handful of files under `src/` — the ~3-line Fabric
+      loader entrypoints and the glue that calls into Ded's API — are original
+      work of this project and owe nothing to the upstream mod. They could in
+      principle be MIT. They are NOT carved out, deliberately: they are too
+      small and too entangled with the derived code to be worth splitting, and
+      placing the whole of `src/` under LGPL-3.0 is the safe reading. If you
+      want a permissively licensed version of that glue, take it from Ded's
+      API instead, where the reusable parts already live.
+
+  (b) MIT  —  `deds-api/`
+
+      Ded's API is an independent shared library written for this project. It
+      contains no code derived from Morph and no code derived from iChunUtil.
+      It is licensed MIT; the text is in `LICENSE.MIT`.
+
+      Copyright (c) 2026 Ded811
+
+      It is vendored into this repository so that the repository builds on its
+      own — see `README.md` and `PUBLISHING.md`. It is not part of the
+      derivative work, and combining it with the LGPL-3.0 module does not
+      place it under LGPL-3.0 (MIT is compatible in that direction).
+
+Anything not listed above — the Gradle build files, this NOTICE, `README.md`,
+`PUBLISHING.md`, `.gitignore` — is MIT, copyright (c) 2026 Ded811.
+
+
+--------------------------------------------------------------------------------
+4. ASSETS (textures and sounds)
+--------------------------------------------------------------------------------
+
+This repository ships 17 PNG textures and 6 OGG sounds that are iChun's
+original artwork and original audio. They are reused unmodified.
+
+WHAT WAS MEASURED (2026-07-30):
+
+  * All 23 shipped asset files are byte-identical — verified by SHA-256, file
+    by file — to files under `assets/morph/` in the upstream `legacy` branch
+    tree at commit `fbf511c`: the four selector-GUI textures
+    (`fav`, `guiSelected`, `guiUnselected`, `guiUnselectedSide`), the twelve
+    ability icons, `morphskin.png`, and `morph1.ogg` … `morph6.ogg`. Only file
+    and directory NAMES were changed, from the original's camelCase to modern
+    Minecraft's lowercase resource layout.
+  * Nothing was recoloured, rescaled, re-encoded or re-cut. There is no
+    derived art in this repository at all.
+  * The mod ships no translations of its own beyond an `en_us.json`; the
+    original's twenty `.lang` files were not carried over.
+
+THE POSITION TAKEN, and its limits:
+
+  These files live inside the upstream repository, alongside the code, under
+  that repository's root `COPYING` / `COPYING.LESSER` pair. On the ordinary
+  reading that a repository's stated licence covers that repository's
+  contents, they are available under LGPL-3.0, and they are shipped here on
+  that basis.
+
+  It is a reading, not a proof, and the honest counter-argument is recorded
+  here rather than hidden: the LGPL is written for software libraries — it
+  speaks of linking, object code and Corresponding Source — so applying it to
+  PNG and OGG files is legally awkward. The upstream repository nowhere states
+  that the artwork and audio are covered, and authors do not always intend a
+  code licence to reach their art.
+
+  All artwork and all sounds in this repository are the creative work of
+  ICHUN, not of this project. If iChun asks for them to be removed, or
+  clarifies that his code licence was never meant to cover his art, the remedy
+  is simple and this project will take it: delete the textures and the sounds
+  and ship code only.
+
+
+--------------------------------------------------------------------------------
+5. TWO OPEN LICENSING QUESTIONS, RECORDED HONESTLY
+--------------------------------------------------------------------------------
+
+  (i) THE ONE-PATCH GAP. The published `legacy` branch declares version
+      **0.7.0**. This port was derived from **0.7.1** — the newest 1.6.4 build
+      iChun released, and the one the 2014 modpack shipped — via a decompile
+      (48 `.java` files, against the branch's 41). The overwhelming majority
+      of what was derived (the identity model, the twelve abilities, the
+      transition rules, the command tree, the config defaults, player morphs)
+      is present in the LGPL-3.0 0.7.0 source and is therefore squarely
+      covered. A strict reader could nonetheless argue that whatever changed
+      between 0.7.0 and 0.7.1 was never offered under any licence. That is the
+      whole of the exposure, and it is small.
+
+      Nothing iChun publishes contradicts the LGPL-3.0 reading. The iChunUtil
+      end-user licence agreement (last updated 2019-03-04) is a
+      warranty-and-where-to-download disclaimer: it addresses liability,
+      third-party download sites and redistribution accountability, and says
+      nothing at all about derivative works, modification, or source reuse.
+      iChun's Morph page states no licence and links to the GitHub source as a
+      contribution target.
+
+ (ii) THE "SOFTWARE LIBRARY" QUESTION. The LGPL is drafted around libraries. A
+      Minecraft mod is not obviously a library. The usual reading in the
+      modding community is that a mod jar qualifies, because it is loaded by,
+      and links against, other code. If you disagree, the LGPL-3.0 expressly
+      permits you to treat your copy of this work as being under the GNU GPL
+      version 3 instead; you are welcome to do so.
+
+Neither question affects your rights as a recipient in any way that costs you
+something: under LGPL-3.0 (or GPL-3.0, at your option) you may use, study,
+modify and redistribute this work.
+
+
+--------------------------------------------------------------------------------
+6. IF YOU REDISTRIBUTE THIS MOD
+--------------------------------------------------------------------------------
+
+The LGPL asks little, but it does ask. If you hand anyone a built jar — a
+release page, a modpack, a link to a friend — you must:
+
+  * include `LICENSE` and `LICENSE.GPL` (the two halves of the LGPL-3.0 text);
+  * keep iChun credited as the original author, and keep the notices in this
+    file intact;
+  * make clear that your copy is modified, and give a date, if you modified
+    it (GPL-3.0 section 5a);
+  * make the Corresponding Source available to whoever you gave the jar to —
+    alongside the jar, from the same place, or by a written offer valid for
+    three years (GPL-3.0 section 6). Pointing at this repository is the easy
+    way to do this;
+  * not add restrictions of your own. Any extra term you try to impose on the
+    LGPL-3.0 parts is removable by whoever receives the work (GPL-3.0
+    section 7).

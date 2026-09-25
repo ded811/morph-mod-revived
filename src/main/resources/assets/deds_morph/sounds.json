@@ -1,0 +1,13 @@
+{
+	"morph": {
+		"subtitle": "subtitles.deds_morph.morph",
+		"sounds": [
+			"deds_morph:morph1",
+			"deds_morph:morph2",
+			"deds_morph:morph3",
+			"deds_morph:morph4",
+			"deds_morph:morph5",
+			"deds_morph:morph6"
+		]
+	}
+}

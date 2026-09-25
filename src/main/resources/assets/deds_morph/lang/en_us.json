@@ -1,0 +1,11 @@
+{
+	"key.category.deds_morph.main": "Morph Mod Revived",
+	"key.deds_morph.selector_prev": "Morph Selector Up",
+	"key.deds_morph.selector_next": "Morph Selector Down",
+	"key.deds_morph.selector_select": "Morph Selector Select",
+	"key.deds_morph.selector_cancel": "Morph Selector Cancel",
+	"key.deds_morph.selector_remove": "Morph Selector Remove",
+	"key.deds_morph.selector_favourite": "Morph Selector Favourite",
+	"hud.deds_morph.own_form": "Own form",
+	"subtitles.deds_morph.morph": "Player morphs"
+}

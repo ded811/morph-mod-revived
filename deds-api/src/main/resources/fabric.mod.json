@@ -1,0 +1,25 @@
+{
+	"schemaVersion": 1,
+	"id": "deds_api",
+	"version": "${version}",
+	"name": "Ded's API",
+	"description": "The tiny shared library behind Ded811's revival mods. Each of them routes its Minecraft and mod-loader plumbing through this one jar, so a single API update keeps every mod working on a new game version. Deliberately minimal (a few dozen small classes) - it adds no blocks, no items, no game content and no measurable overhead. Mods that need it usually bundle it, so there is normally nothing to install separately.",
+	"authors": ["Ded811"],
+	"license": "MIT",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"com.deds.api.fabric.DedsApiFabric"
+		],
+		"client": [
+			"com.deds.api.fabric.client.DedsApiFabricClient"
+		]
+	},
+	"mixins": ["deds_api.mixins.json"],
+	"depends": {
+		"fabricloader": ">=0.19.3",
+		"minecraft": "${minecraft_range}",
+		"java": ">=25",
+		"fabric-api": "*"
+	}
+}

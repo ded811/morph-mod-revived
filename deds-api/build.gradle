@@ -1,0 +1,5 @@
+// Ded's API - MIT, copyright (c) 2026 Ded811. See ../LICENSE.MIT and
+// ../NOTICE section 3b. Contains no code derived from Morph.
+base {
+	archivesName = 'deds-api'
+}

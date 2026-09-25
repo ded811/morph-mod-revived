@@ -1,0 +1,8 @@
+# Minecraft 26.2 -> 26.3 class renames. One '<canonical 26.2> <26.3>' pair
+# per line; see versions/README.md. A bare simple name renames the class
+# everywhere it is referenced by its simple name (imports included, since
+# the qualified form contains it too).
+#
+# EnderMan became Enderman in 26.3 (same package):
+#   26.3 decompile: net/minecraft/world/entity/monster/Enderman.java
+EnderMan Enderman

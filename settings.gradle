@@ -1,0 +1,17 @@
+pluginManagement {
+	repositories {
+		maven {
+			name = 'Fabric'
+			url = 'https://maven.fabricmc.net/'
+		}
+		mavenCentral()
+		gradlePluginPortal()
+	}
+}
+
+rootProject.name = 'morph-mod-revived'
+
+// Ded's API is vendored into this repository (see NOTICE section 3b and
+// PUBLISHING.md) so that a fresh clone builds with no external Maven setup.
+// It is MIT-licensed and independent of the LGPL-3.0 mod in `src/`.
+include ':deds-api'

@@ -1,0 +1,250 @@
+import java.util.regex.Matcher
+import java.util.regex.Pattern
+
+// Standalone build for "Morph Mod Revived".
+//
+// Two projects:
+//   :          (this one)  the mod itself   - LGPL-3.0, sources in src/
+//   :deds-api               Ded's API       - MIT,       sources in deds-api/
+//
+// Ded's API is vendored rather than pulled from a Maven repository so that a
+// fresh clone of this repository builds with nothing else set up. That also
+// makes this repository the "Corresponding Source" that GPL-3.0 section 6 -
+// incorporated by LGPL-3.0 - requires of anyone distributing a built jar.
+// See NOTICE section 3.
+
+plugins {
+	id 'net.fabricmc.fabric-loom' version "${loom_version}" apply false
+}
+
+// ======================================================================
+// THE MINECRAFT TARGET
+//
+// One source tree, several Minecraft versions; versions/README.md is the
+// manual. The shared sources are written for the CANONICAL version
+// (mc_canonical in gradle.properties); `-Pmc=<version>` builds another,
+// derived at build time from a rename table and an overlay. The toolchain
+// for each version lives in versions/mc<version>.properties.
+// ======================================================================
+
+def morphTarget = rootProject.property('mc').toString().trim()
+def morphCanonical = rootProject.property('mc_canonical').toString().trim()
+def morphTargetFile = rootProject.file("versions/mc${morphTarget}.properties")
+if (!morphTargetFile.isFile()) {
+	def known = rootProject.file('versions').listFiles()
+			.findAll { it.name ==~ /mc.+\.properties/ }
+			.collect { it.name.replaceAll(/^mc|\.properties$/, '') }
+			.sort()
+	throw new GradleException("Unknown Minecraft target mc=${morphTarget}: there is no "
+			+ "versions/mc${morphTarget}.properties. Known targets: ${known}. "
+			+ "See versions/README.md.")
+}
+def morphTargetProps = new Properties()
+morphTargetFile.withInputStream { morphTargetProps.load(it) }
+['minecraft_version', 'loader_version', 'fabric_api_version'].each { key ->
+	if (!morphTargetProps.getProperty(key)?.trim()) {
+		throw new GradleException("versions/mc${morphTarget}.properties is missing ${key}")
+	}
+}
+if (morphTargetProps.getProperty('minecraft_version').trim() != morphTarget) {
+	throw new GradleException("versions/mc${morphTarget}.properties says minecraft_version="
+			+ "${morphTargetProps.getProperty('minecraft_version').trim()}; the file name and the "
+			+ "property must agree")
+}
+
+rootProject.ext.mc = morphTarget
+rootProject.ext.mc_is_canonical = (morphTarget == morphCanonical)
+rootProject.ext.minecraft_version = morphTarget
+rootProject.ext.loader_version = morphTargetProps.getProperty('loader_version').trim()
+rootProject.ext.fabric_api_version = morphTargetProps.getProperty('fabric_api_version').trim()
+// "~26.3": the fabric.mod.json range for this target, expanded into both
+// manifests so a jar built for one version refuses to load on the other.
+rootProject.ext.minecraft_range = "~${morphTarget}".toString()
+// 0.1.0-beta+mc26.3: the mod version and the game it is for, in one string.
+rootProject.ext.mod_version_full = "${rootProject.mod_version}+mc${morphTarget}".toString()
+
+// ---- the rename table for a derived target ---------------------------
+// versions/mc<target>/renames.txt: "<canonical FQN> <target FQN>" per line.
+// Both the dotted form (imports, code) and the slashed form (mixin
+// descriptor strings) are applied, longest names first, and a name only
+// matches when the next character is not an identifier character.
+def morphRenameFile = rootProject.file("versions/mc${morphTarget}/renames.txt")
+def morphRenamePairs = []
+if (morphRenameFile.isFile()) {
+	morphRenameFile.eachLine { line ->
+		def t = line.trim()
+		if (!t || t.startsWith('#')) {
+			return
+		}
+		def parts = t.split(/\s+/)
+		if (parts.length != 2 || parts[0] == parts[1]) {
+			throw new GradleException("${morphRenameFile}: expected '<canonical> <target>', got: ${line}")
+		}
+		morphRenamePairs << [parts[0], parts[1]]
+		morphRenamePairs << [parts[0].replace('.', '/'), parts[1].replace('.', '/')]
+	}
+	morphRenamePairs.sort { -it[0].length() }
+}
+// A qualified name ('a.b.C' / 'a/b/C') needs no guard in front: the slashed
+// form must still match after the 'L' of a descriptor. A BARE simple name
+// (a class that was renamed, not moved - EnderMan -> Enderman in 26.3) gets
+// a guard on both sides, so it can only ever match the whole identifier.
+def morphRenamePatterns = morphRenamePairs.collect { pair ->
+	def bare = !pair[0].contains('.') && !pair[0].contains('/')
+	def front = bare ? '(?<![A-Za-z0-9_$])' : ''
+	[Pattern.compile(front + Pattern.quote(pair[0]) + '(?![A-Za-z0-9_])'), Matcher.quoteReplacement(pair[1])]
+}
+rootProject.ext.renameLine = { String line ->
+	def out = line
+	for (p in morphRenamePatterns) {
+		out = p[0].matcher(out).replaceAll(p[1])
+	}
+	return out
+}
+
+/**
+ * A source root as this target sees it: a LIST for java.srcDirs /
+ * resources.srcDirs. The canonical target compiles the real directory (plus
+ * its own overlay, if any) untouched, so the IDE and javac read the same
+ * files. A derived target compiles one Sync task's output under
+ * <project>/build/versioned/mc<target>/: the shared root copied through the
+ * rename table (Java files only), with every file the overlay
+ * versions/mc<target>/<root> also holds taken from the overlay instead.
+ * The element is a Provider carrying the task dependency.
+ */
+rootProject.ext.versionedRoot = { Project p, String rel ->
+	def base = rootProject.file(rel)
+	def overlay = rootProject.file("versions/mc${morphTarget}/${rel}")
+	if (rootProject.ext.mc_is_canonical) {
+		return overlay.isDirectory() ? [base, overlay] : [base]
+	}
+	def shadowed = []
+	if (overlay.isDirectory()) {
+		overlay.eachFileRecurse { f ->
+			if (f.isFile()) {
+				shadowed << overlay.toPath().relativize(f.toPath()).toString().replace('\\', '/')
+			}
+		}
+	}
+	def taskName = 'versionedSources_' + rel.replaceAll(/[^A-Za-z0-9]+/, '_')
+	def task = p.tasks.register(taskName, Sync) {
+		group = 'build setup'
+		description = "Derives ${rel} for Minecraft ${morphTarget}: rename table + overlay"
+		into p.layout.buildDirectory.dir("versioned/mc${morphTarget}/${rel}")
+		inputs.files(morphRenameFile).withPropertyName('renames')
+		inputs.property('shadowed', shadowed.toString())
+		from(base) {
+			exclude shadowed
+			filesMatching('**/*.java') {
+				filter { String line -> rootProject.ext.renameLine(line) }
+			}
+		}
+		if (overlay.isDirectory()) {
+			from(overlay)
+		}
+	}
+	return [task.map { it.destinationDir }]
+}
+
+allprojects {
+	apply plugin: 'net.fabricmc.fabric-loom'
+	apply plugin: 'java-library'
+
+	// Ded's API carries its own version line (api_version). The mod's
+	// fabric.mod.json depends on `deds_api ">=2.0.0 <3.0.0"`, so the nested
+	// API jar MUST declare a version inside that range or Fabric Loader
+	// rejects the mod at startup.
+	version = (project.path == ':deds-api') ? rootProject.api_version : rootProject.mod_version_full
+	group = rootProject.maven_group
+
+	dependencies {
+		minecraft "com.mojang:minecraft:${rootProject.minecraft_version}"
+		implementation "net.fabricmc:fabric-loader:${rootProject.loader_version}"
+		implementation "net.fabricmc.fabric-api:fabric-api:${rootProject.fabric_api_version}"
+	}
+
+	processResources {
+		def v = project.version
+		def range = rootProject.minecraft_range
+		def mcv = rootProject.minecraft_version
+		inputs.property 'version', v
+		inputs.property 'minecraft_range', range
+		inputs.property 'minecraft_version', mcv
+		filesMatching('fabric.mod.json') {
+			expand 'version': v, 'minecraft_range': range, 'minecraft_version': mcv
+		}
+	}
+
+	tasks.withType(JavaCompile).configureEach {
+		it.options.release = 25
+		it.options.encoding = 'UTF-8'
+	}
+
+	java {
+		withSourcesJar()
+		sourceCompatibility = JavaVersion.VERSION_25
+		targetCompatibility = JavaVersion.VERSION_25
+	}
+}
+
+// GPL-3.0 sections 4-6, incorporated by LGPL-3.0: every recipient must get a
+// copy of the licence and the notices must stay intact. Put both halves of
+// the LGPL-3.0 - and the attribution/statement-of-changes NOTICE - inside
+// every jar, so a player who only ever sees the jar still receives them.
+allprojects {
+	tasks.named('jar') {
+		from(rootProject.rootDir) {
+			include 'LICENSE'
+			include 'LICENSE.GPL'
+			include 'LICENSE.MIT'
+			include 'NOTICE'
+		}
+	}
+}
+
+base {
+	archivesName = 'morph-mod-revived'
+}
+
+dependencies {
+	implementation project(':deds-api')
+	// Nest Ded's API inside the mod jar so players only download one file.
+	// MIT-licensed and separately identified - see NOTICE section 3.
+	include project(':deds-api')
+}
+
+fabricApi {
+	configureTests {
+		createSourceSet = true
+		modId = 'deds_morph_test'
+		enableGameTests = true
+		// `./gradlew runClientGameTest` boots a real client - the only layer
+		// that can see the morph render stack at all - and screenshots it for
+		// a human, on top of hard assertions on the two render-state fields
+		// vanilla's lie-down branch keys on. NOT part of `build`: it needs a
+		// display.
+		enableClientGameTests = true
+		eula = true
+	}
+}
+
+// The source sets, as this target sees them (identity on the canonical one).
+sourceSets {
+	main {
+		java.srcDirs = rootProject.ext.versionedRoot(project, 'src/main/java')
+		resources.srcDirs = rootProject.ext.versionedRoot(project, 'src/main/resources')
+	}
+	gametest {
+		java.srcDirs = rootProject.ext.versionedRoot(project, 'src/gametest/java')
+		resources.srcDirs = rootProject.ext.versionedRoot(project, 'src/gametest/resources')
+	}
+}
+
+project(':deds-api') {
+	sourceSets {
+		main {
+			java.srcDirs = rootProject.ext.versionedRoot(project, 'deds-api/src/main/java')
+			resources.srcDirs = rootProject.ext.versionedRoot(project, 'deds-api/src/main/resources')
+		}
+	}
+}

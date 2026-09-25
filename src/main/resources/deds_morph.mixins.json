@@ -1,0 +1,21 @@
+{
+	"required": true,
+	"minVersion": "0.8",
+	"package": "com.deds.morph.fabric.client.mixin",
+	"client": [
+		"AgeableMobRendererAccessor",
+		"AvatarRendererMixin",
+		"EntityRenderDispatcherMixin",
+		"EntitySharedFlagsInvoker",
+		"HudAirBubblesMixin",
+		"InventoryScreenInvoker",
+		"InventoryScreenMixin",
+		"LivingEntityRendererInvoker",
+		"ModelPartAccessor",
+		"PlayerEyeHeightMixin",
+		"SquidAccessor"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	}
+}

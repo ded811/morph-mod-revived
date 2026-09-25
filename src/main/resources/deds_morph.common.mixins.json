@@ -1,0 +1,32 @@
+{
+	"required": true,
+	"minVersion": "0.8",
+	"package": "com.deds.morph.fabric.mixin",
+	"mixins": [
+		"AvoidEntityGoalAccessor",
+		"AvoidEntityGoalMixin",
+		"MobGoalsAccessor",
+		"EntityFireImmuneMixin",
+		"EntityStartRidingMixin",
+		"LivingEntityBreatheMixin",
+		"LivingEntityDimensionsMixin",
+		"LivingEntityFallMixin",
+		"LivingEntityHurtSoundInvoker",
+		"LivingEntityRidingPositionMixin",
+		"LivingEntityWaterDragMixin",
+		"MobInvoker",
+		"MobSetTargetMixin",
+		"NearestAttackableTargetGoalMixin",
+		"PlayerHurtSoundMixin",
+		"PlayerSleepInBedMixin",
+		"ServerLevelAddFreshEntityMixin",
+		"ServerPlayerDieMixin",
+		"TargetGoalAccessor",
+		"TargetingConditionsAccessor",
+		"VillagerHostilesSensorAccessor",
+		"VillagerHostilesSensorMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	}
+}
