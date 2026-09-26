@@ -16,8 +16,8 @@ import net.minecraft.client.Minecraft;
  * level-render hook and the end-of-tick hook are loader glue and live in each
  * loader's client entrypoint ({@code com.deds.morph.fabric.MorphFabricClient}
  * on Fabric, {@code com.deds.morph.neoforge.MorphNeoForgeClient} on NeoForge),
- * which calls {@link #init()} first and routes its end-of-tick hook to
- * {@link #clientTick(Minecraft)}.
+ * which calls {@link #init()} (on NeoForge, from RegisterKeyMappingsEvent)
+ * and routes its end-of-tick hook to {@link #clientTick(Minecraft)}.
  *
  * <p>Wave 2 (selector GUI overhaul): the browse keys now ship BOUND to their
  * original defaults {@code [} / {@code ]} via the {@link ClientKeys} default-key

@@ -103,6 +103,15 @@ Morph. This is one of the two differences players can notice.
 `neoforge/src/main/java/com/deds/morph/neoforge/MorphNeoForgeClient.java` and
 `deds-api/neoforge/.../client/DedsApiNeoForgeClient.java`:
 
+- **When the client half starts.** On Fabric every "main" entrypoint runs
+  before any "client" one, and Morph's client setup (`MorphClient.init()`)
+  counts on that. A NeoForge client constructor has no such promise: a newer
+  Ded's API, which another Ded's mod can bring along (NeoForge keeps the
+  newest nested `deds_api`), runs each mod's `onInitialize` inside NeoForge's
+  registry events, after every mod is constructed. So `MorphClient.init()`
+  runs from `RegisterKeyMappingsEvent` at `EventPriority.HIGHEST` on Morph's
+  own bus: after every registry event with either API version, and before
+  Ded's API turns the queued key bindings into mappings.
 - **Key bindings.** NeoForge loads saved bindings only for mappings
   registered in `RegisterKeyMappingsEvent`. Ded's API queues every binding
   and registers them all from one listener at `EventPriority.LOWEST` (after

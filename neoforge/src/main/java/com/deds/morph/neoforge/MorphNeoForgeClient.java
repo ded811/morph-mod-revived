@@ -6,10 +6,12 @@ import com.deds.morph.client.MorphClient;
 import com.deds.morph.client.MorphRadial;
 
 import net.neoforged.api.distmarker.Dist;
+import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.client.event.RegisterGuiLayersEvent;
+import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
 import net.neoforged.neoforge.client.event.SubmitCustomGeometryEvent;
 import net.neoforged.neoforge.client.gui.GuiLayer;
 import net.neoforged.neoforge.client.gui.VanillaGuiLayers;
@@ -47,17 +49,26 @@ import net.minecraft.client.Minecraft;
  *     (no world, so no Morph tick has anything to do then).</li>
  * </ul>
  *
- * <p>Constructed after {@link MorphNeoForge} (FML runs a mod's all-dist entry
- * class first) and after Ded's API's client entry class (the AFTER ordering in
- * neoforge.mods.toml), so the S2C message exists and the key backend is
- * installed when {@link MorphClient#init()} runs, as on Fabric where every
- * "main" entrypoint runs before any "client" one.</p>
+ * <p><b>When {@link MorphClient#init()} runs.</b> Not in this constructor: at
+ * {@code RegisterKeyMappingsEvent}, {@link EventPriority#HIGHEST}, on Morph's
+ * own bus. Fabric runs every "main" entrypoint before any "client" one, and
+ * {@code init()} relies on that ({@code Morph.ACQUIRE_FX} is set by Morph's
+ * {@code onInitialize}). A NeoForge mod constructor gives no such promise:
+ * a newer Ded's API, which another Ded's mod may bring along (NeoForge keeps
+ * the newest copy of every nested deds_api), runs {@code onInitialize} inside
+ * NeoForge's registry events, after every mod is constructed. That event
+ * fires once, on the main thread, after every registry event whichever API
+ * version runs Morph's {@code onInitialize}, and HIGHEST puts the keys ahead
+ * of Ded's API's own LOWEST listener, which turns the queued bindings into
+ * real key mappings. The other three hooks below only register listeners,
+ * which is safe at construction.</p>
  */
 @Mod(value = Morph.MOD_ID, dist = Dist.CLIENT)
 public final class MorphNeoForgeClient {
 
     public MorphNeoForgeClient(IEventBus modBus) {
-        MorphClient.init();
+        modBus.addListener(EventPriority.HIGHEST, RegisterKeyMappingsEvent.class,
+                event -> MorphClient.init());
 
         modBus.addListener(RegisterGuiLayersEvent.class, event ->
                 event.wrapLayer(VanillaGuiLayers.CROSSHAIR,
