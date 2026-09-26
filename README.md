@@ -19,6 +19,10 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/licence-LGPL--3.0-blue?style=flat-square" alt="LGPL-3.0"></a>
 </p>
 
+<p align="center">
+  <img src="docs/demo.gif" width="800" alt="A player turning into a zombie, then a wolf, then back into themselves">
+</p>
+
 An unofficial revival of **iChun's Morph**, the classic Minecraft 1.6.4 mod,
 rebuilt for **Minecraft 26.2 and 26.3** on **Fabric** and **NeoForge**.
 

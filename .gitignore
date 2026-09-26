@@ -8,6 +8,9 @@ gradle-app.setting
 # Release jars, kept out of build/ so the next build cannot overwrite them
 release/
 
+# The source recording of the demo (36 MB); docs/demo.gif is made from it
+docs/demo.mp4
+
 # Loader run directories. The Fabric and NeoForge mod projects run the
 # canonical Minecraft version in <project>/run/ and any other target in
 # <project>/run-mc<version>/ (see fabric/build.gradle and

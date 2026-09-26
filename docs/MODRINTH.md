@@ -2,6 +2,8 @@
 
 **Kill a mob, become the mob.**
 
+![A player turning into a zombie, then a wolf, then back into themselves](https://raw.githubusercontent.com/ded811/morph-mod-revived/main/docs/demo.gif)
+
 An unofficial revival of **iChun's Morph**, based on its classic Minecraft 1.6.4
 version and rebuilt for **Minecraft 26.2 and 26.3** on **Fabric** and
 **NeoForge**.
