@@ -7,6 +7,10 @@
 <p align="center"><b>Kill a mob, become the mob.</b></p>
 
 <p align="center">
+  <img src="docs/demo.gif" width="800" alt="A player turning into a zombie, then a wolf, then back into themselves">
+</p>
+
+<p align="center">
   <a href="https://modrinth.com/mod/morph-mod-revived"><img src="https://img.shields.io/badge/Download-Modrinth-00AF5C?style=for-the-badge&logo=modrinth&logoColor=white" alt="Download Morph Mod Revived on Modrinth"></a>
   <a href="https://github.com/ded811/morph-mod-revived"><img src="https://img.shields.io/badge/Source-GitHub-181717?style=for-the-badge&logo=github&logoColor=white" alt="Morph Mod Revived on GitHub"></a>
 </p>
@@ -17,10 +21,6 @@
   <img src="https://img.shields.io/badge/Minecraft-26.2%20%7C%2026.3-brightgreen?style=flat-square" alt="Minecraft 26.2 and 26.3">
   <img src="https://img.shields.io/badge/status-beta-orange?style=flat-square" alt="Beta">
   <a href="LICENSE"><img src="https://img.shields.io/badge/licence-LGPL--3.0-blue?style=flat-square" alt="LGPL-3.0"></a>
-</p>
-
-<p align="center">
-  <img src="docs/demo.gif" width="800" alt="A player turning into a zombie, then a wolf, then back into themselves">
 </p>
 
 An unofficial revival of **iChun's Morph**, the classic Minecraft 1.6.4 mod,
