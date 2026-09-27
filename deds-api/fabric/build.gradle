@@ -19,7 +19,7 @@ group = project.maven_group
 
 base {
 	// Plain "deds-api", as before the split: Loom names the nested file after
-	// this jar, so the mod jar keeps carrying META-INF/jars/deds-api-2.1.0.jar.
+	// this jar, so the mod jar carries META-INF/jars/deds-api-<api_version>.jar.
 	archivesName = 'deds-api'
 }
 
@@ -40,6 +40,11 @@ dependencies {
 	minecraft "com.mojang:minecraft:${project.minecraft_version}"
 	implementation "net.fabricmc:fabric-loader:${project.loader_version}"
 	implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+	// The energy bridge's one dependency (gradle.properties). Plain
+	// `implementation`, never `api`: mod code must not see team.reborn.*
+	// types. Nested, so the deds-api jar carries its own copy.
+	implementation "teamreborn:energy:${project.tr_energy_version}"
+	include "teamreborn:energy:${project.tr_energy_version}"
 }
 
 processResources {

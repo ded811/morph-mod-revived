@@ -24,6 +24,20 @@ public interface Platform {
 
     Path configDir();
 
-    /** Creates the per-mod context and runs the mod's initialization. */
+    /**
+     * Creates the per-mod context and arranges for the mod's initialization
+     * to run: immediately (Fabric) or once the loader allows registration
+     * (NeoForge); see {@link com.deds.api.Deds#init}.
+     */
     ModContext initMod(String modId, DedsMod mod);
+
+    /**
+     * Runs a mod's client setup at the loader's "every mod initialized"
+     * moment; see {@link com.deds.api.Deds#initClient} (Ded's API v2.9). The
+     * default runs it immediately, which is right for a loader that already
+     * calls client entrypoints after every main one.
+     */
+    default void initClient(String modId, Runnable init) {
+        init.run();
+    }
 }

@@ -3,13 +3,19 @@
 	"minVersion": "0.8",
 	"package": "com.deds.api.neoforge.mixin",
 	"mixins": [
+		"BlockEntitySetChangedMixin",
+		"EntityFluidInteractionMixin",
+		"FireBlockInvoker",
+		"FluidAccessor",
 		"LivingEntityKillMixin",
 		"MinecraftServerStoppingMixin",
 		"ServerGamePacketListenerUseEntityMixin",
+		"ServerPlayerGameModeBlockMixin",
 		"ServerPlayerKillMixin"
 	],
 	"client": [
-		"MinecraftUseEntityMixin"
+		"MinecraftUseEntityMixin",
+		"MultiPlayerGameModeBlockMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

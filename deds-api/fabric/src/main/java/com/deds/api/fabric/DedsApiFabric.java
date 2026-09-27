@@ -27,6 +27,13 @@ public final class DedsApiFabric implements ModInitializer {
     public void onInitialize() {
         Deds.LOGGER.info("Ded's API initializing on Fabric");
 
+        // Ded's API v2.4: the energy bridge — installs the item-energy
+        // component into ItemEnergy and registers the EnergyStorage.ITEM
+        // fallback for EnergyContainerItem. Runs before any mod initializes
+        // (mods depend on deds_api, and Fabric initializes dependencies
+        // first), which is what ItemEnergy's install contract promises.
+        FabricEnergyBridge.init();
+
         ServerLifecycleEvents.SERVER_STARTED.register(
                 server -> ServerEvents.STARTED.invoke(server));
         ServerLifecycleEvents.SERVER_STOPPING.register(

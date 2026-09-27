@@ -35,7 +35,10 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  * return from {@code startUseItem} (no other hand, no item use). A FAIL sends
  * nothing. NeoForge's {@code EntityInteract} cannot stand in: on the client it
  * fires after vanilla already sent the packet, so a FAIL could not suppress
- * it.</p>
+ * it. One NeoForge-only way to skip this event: NeoForge posts
+ * {@code InputEvent.InteractionKeyMappingTriggered} earlier in
+ * {@code startUseItem}, and a mod cancelling that stops the whole right-click
+ * before this point, the client event included.</p>
  *
  * <p><b>Locals by TYPE.</b> Fabric names them ({@code hand},
  * {@code entityHit}, {@code entity}); javap {@code -c -l} of both NeoForge

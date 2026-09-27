@@ -34,12 +34,13 @@ import java.util.function.Supplier;
  * {@link com.deds.api.config.ConfigRegistrar#register}.</p>
  *
  * <p>It names no loader, so it is shared, and every loader backend hands out
- * the same file with the same behaviour. It used to be the Fabric backend's
- * package-private {@code FabricConfig} and is that class unchanged apart from
- * its name, its package and the public visibility a backend in another
- * package needs: same file paths, same {@code .bak} copy of a file that
- * failed to load, same {@code .tmp} write-then-move. Not API: mods reach it
- * only through {@link com.deds.api.config.ConfigRegistrar}.</p>
+ * the same file with the same behaviour. It replaces the Fabric backend's
+ * package-private {@code FabricConfig} (same file paths, same {@code .tmp}
+ * write-then-move) and adds one thing that class did not have: a {@code .bak}
+ * copy of a file that failed to load, taken before anything is written, so a
+ * player's hand edit is never silently lost (first shipped in the copy of this
+ * API vendored by Morph Mod Revived; adopted here in 2.9.0). Not API: mods
+ * reach it only through {@link com.deds.api.config.ConfigRegistrar}.</p>
  */
 public final class JsonConfigFile<C> implements ConfigHandle<C> {
 

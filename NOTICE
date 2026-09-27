@@ -210,6 +210,15 @@ changed one URL in the copyright line from `http://fsf.org/` to
       under MIT stay under MIT for anyone who has or gets one; this copy, and
       any copy made from it, is LGPL-3.0-only.
 
+      One third-party library rides along. Since 0.2.1 (Ded's API 2.9.0) the
+      Fabric build of Ded's API depends on Team Reborn Energy 5.0.0
+      (`teamreborn:energy`, https://github.com/TechReborn/Energy), the Fabric
+      energy standard, and nests its jar inside the deds-api jar. It is by
+      Team Reborn and modmuss50 and MIT licensed; its jar carries its own
+      `LICENSE`, which must stay with it. None of its source is in this
+      repository and nothing here is derived from it. Morph itself never uses
+      energy.
+
   (c) Everything else:  the Gradle build scripts (`build.gradle`,
       `settings.gradle`, `gradle.properties`, `fabric/build.gradle`,
       `neoforge/build.gradle`, `deds-api/fabric/build.gradle` and

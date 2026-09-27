@@ -30,9 +30,10 @@ import java.util.function.Consumer;
  * constructed. So {@link #c2s}/{@link #s2c} queue the type, and
  * {@link DedsApiNeoForge} registers the whole queue from that event; a
  * registration after it throws {@link IllegalStateException}, as Fabric's
- * registry would refuse a late payload type. Registering the same name in
- * both directions is refused by NeoForge's own registrar (Fabric keeps the two
- * directions apart and would allow it).</p>
+ * registry would refuse a late payload type. A name registered twice is
+ * refused at the second call, with Fabric's message. Registering the same
+ * name in both directions is refused too, because NeoForge allows one payload
+ * per id (Fabric keeps the two directions apart and would allow it).</p>
  *
  * <p><b>Optional, as on Fabric.</b> The payloads are registered optional
  * ({@link DedsApiNeoForge}), so NeoForge's channel negotiation never refuses a
@@ -120,7 +121,20 @@ public final class NeoForgeMessageType<T> implements MessageType<T> {
         if (registered) {
             throw new IllegalStateException("message " + type.id + " registered "
                     + "after NeoForge's RegisterPayloadHandlersEvent; register "
-                    + "messages during DedsMod.onInitialize (mod construction)");
+                    + "messages during DedsMod.onInitialize");
+        }
+        // Refused here, from the mod's own call, rather than at the end of
+        // loading from inside Ded's API's listener, where NeoForge would.
+        for (NeoForgeMessageType<?> queued : ALL) {
+            if (queued.id.equals(type.id)) {
+                if (queued.clientToServer == type.clientToServer) {
+                    throw new IllegalArgumentException("Packet type " + type.id
+                            + " is already registered!");
+                }
+                throw new IllegalArgumentException("message " + type.id + " is already "
+                        + "registered in the other direction; NeoForge allows one payload "
+                        + "per id, so give the two directions different names");
+            }
         }
         ALL.add(type);
         return type;

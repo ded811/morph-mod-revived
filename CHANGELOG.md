@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.2.1-beta
+
+**Nothing changes in how Morph plays.** This release updates the copy of
+Ded's API that comes inside the mod from 2.1.0 to 2.9.0, the version the other
+mods built on it now ship. If you play Morph together with other mods built on
+Ded's API, they all get the same complete API, on Fabric and on NeoForge.
+
+**Pick the jar for your loader and your Minecraft version:**
+
+| | Minecraft 26.2 | Minecraft 26.3 |
+| --- | --- | --- |
+| Fabric | `morph-mod-revived-fabric-0.2.1-beta+mc26.2.jar` | `morph-mod-revived-fabric-0.2.1-beta+mc26.3.jar` |
+| NeoForge | `morph-mod-revived-neoforge-0.2.1-beta+mc26.2.jar` | `morph-mod-revived-neoforge-0.2.1-beta+mc26.3.jar` |
+
+You need the same things as for 0.2.0-beta (below). Your worlds, morph
+collections and settings carry over.
+
+On Fabric, your mod list may now also show **Energy**, a small library by Team
+Reborn that Ded's API uses. It comes inside the jar, so there's nothing extra
+to download.
+
 ## 0.2.0-beta
 
 **Morph Mod Revived now runs on NeoForge too**, for **Minecraft 26.2 and 26.3**,

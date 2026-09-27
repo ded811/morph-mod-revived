@@ -22,7 +22,12 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * Blocks became the third consumer (MOD-COOKBOOK §14, 3rd-consumer rule).</p>
  *
  * <p>Wrappers are applied in registration order, each one seeing the previous
- * one's result, so two mods can never silently drop each other's wrapper.</p>
+ * one's result, so two mods can never silently drop each other's wrapper. A
+ * wrapper that THROWS is skipped for that block state (the error is logged,
+ * once per wrapper per resource reload) and the chain goes on with the model
+ * as it was before it: one mod's broken wrapper costs only its own work
+ * (since v2.9; before, a throw lost every wrapper's result for that
+ * state).</p>
  *
  * <p><b>Order-independent by construction.</b> This class holds the registry
  * itself and the platform merely reads it at bake time, so a mod may register

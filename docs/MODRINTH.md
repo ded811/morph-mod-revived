@@ -187,7 +187,9 @@ version: `morph-mod-revived-fabric-...` is for Fabric and
 `morph-mod-revived-neoforge-...` is for NeoForge, and the name ends in
 `+mc26.2` or `+mc26.3`. Each file only works on that loader and that version.
 You might see **Ded's API** in your mod list: it comes inside this mod, so you
-don't need to download it separately.
+don't need to download it separately. On Fabric you might also see
+**Energy**, Team Reborn's small energy library, which Ded's API brings along.
+It comes inside too.
 
 On a server, install the mod on the server **and** on every player's game, with
 the same loader on both. In singleplayer, just put it in your mods folder. For

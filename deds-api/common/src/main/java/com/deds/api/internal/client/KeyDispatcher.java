@@ -10,6 +10,7 @@ import net.minecraft.client.Minecraft;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 /**
  * The loader-neutral half of the {@link ClientKeys} backend: the mappings'
@@ -25,7 +26,7 @@ import java.util.function.Consumer;
  * between Minecraft versions (reading a binding's raw device state, and
  * mapping a portable default onto the running version's
  * {@code InputConstants}) are in {@link RawKeys}, the only key-machinery
- * class with a per-version overlay.</p>
+ * class that changes with the Minecraft version.</p>
  *
  * <p>Not API: mods use {@link ClientKeys}.</p>
  */
@@ -33,6 +34,21 @@ public final class KeyDispatcher {
 
     private static final List<PressKey> KEYS = new CopyOnWriteArrayList<>();
     private static final List<HeldKey> HELD_KEYS = new CopyOnWriteArrayList<>();
+
+    /**
+     * Whether a mapping's key MODIFIER is held, for the paths that poll the
+     * raw key instead of receiving clicks (mouse-bound presses, held
+     * bindings). Vanilla controls, and so Fabric's, cannot bind a modifier:
+     * always true. NeoForge's controls screen can ("Ctrl + Space"), and its
+     * backend installs NeoForge's own test, so a raw poll honours the
+     * modifier exactly as NeoForge's click path does.
+     */
+    private static volatile Predicate<KeyMapping> modifierHeld = mapping -> true;
+
+    /** Internal: installed by a loader backend whose controls bind modifiers. */
+    public static void useModifierCheck(Predicate<KeyMapping> check) {
+        modifierHeld = check;
+    }
 
     private KeyDispatcher() {
     }
@@ -115,7 +131,8 @@ public final class KeyDispatcher {
                 while (press.key.consumeClick()) {
                     // drained — the raw edge below is the one trigger
                 }
-                boolean down = !screenOpen && RawKeys.isDown(minecraft, press.key);
+                boolean down = !screenOpen && RawKeys.isDown(minecraft, press.key)
+                        && modifierHeld.test(press.key);
                 if (down && !press.wasDown) {
                     press.onPress.run();
                 }
@@ -138,7 +155,8 @@ public final class KeyDispatcher {
             return;
         }
         for (HeldKey held : HELD_KEYS) {
-            boolean down = RawKeys.isDown(minecraft, held.key);
+            boolean down = RawKeys.isDown(minecraft, held.key)
+                    && modifierHeld.test(held.key);
             if (down != held.wasDown) {
                 held.wasDown = down;
                 held.onChange.accept(down);

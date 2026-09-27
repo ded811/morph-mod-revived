@@ -1,34 +1,36 @@
 package com.deds.api.neoforge.client;
 
 import com.deds.api.Deds;
+import com.deds.api.client.BlockEntityRenderers;
 import com.deds.api.client.BlockFaceSampler;
 import com.deds.api.client.BlockModelWrappers;
-import com.deds.api.client.BlockTints;
 import com.deds.api.client.ClientKeys;
+import com.deds.api.client.FluidRenderers;
+import com.deds.api.internal.client.CachingBlockFaceSampler;
 import com.deds.api.internal.client.KeyDispatcher;
+import com.deds.api.internal.client.ModelWrapping;
 import com.deds.api.internal.client.RawKeyMapping;
+import com.deds.api.internal.client.VanillaBlockEntityRenderers;
+import com.deds.api.neoforge.ClientInitQueue;
 
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
-import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
+import net.neoforged.neoforge.client.event.ModelEvent;
+import net.neoforged.neoforge.client.event.RegisterFluidModelsEvent;
 import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
+import net.neoforged.neoforge.client.extensions.common.RegisterClientExtensionsEvent;
 import net.neoforged.neoforge.client.network.event.RegisterClientPayloadHandlersEvent;
 import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.event.entity.EntityAttributeCreationEvent;
 
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.block.BlockAndTintGetter;
 import net.minecraft.client.renderer.block.dispatch.BlockStateModel;
-import net.minecraft.core.BlockPos;
 import net.minecraft.resources.Identifier;
-import net.minecraft.util.RandomSource;
-import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
-
-import it.unimi.dsi.fastutil.ints.IntList;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -38,48 +40,30 @@ import java.util.function.Consumer;
 
 /**
  * NeoForge CLIENT entrypoint of Ded's API, the counterpart of
- * {@code DedsApiFabricClient}: the {@link ClientKeys} backend, the client
- * payload handlers and the per-tick key dispatch.
- *
- * <p><b>Keys.</b> On Fabric a binding is registered the moment a mod asks.
- * On NeoForge the only moment a mapping is both saved AND loaded back is
- * {@code RegisterKeyMappingsEvent}, which {@code Options} posts right before
- * it reads options.txt (after every mod is constructed); one added later
- * would still be saved, but its saved binding would never be read again. So
- * {@link ClientKeys#register} queues here, and ONE listener at
- * {@link EventPriority#LOWEST} (after every other mod's normal-priority
- * listener, so a mod may register from its own listener too) creates each
- * mod's controls category with {@code registerCategory} (vanilla's
- * {@code KeyMapping.Category.register} is deprecated on NeoForge and appends
- * unsorted; NeoForge's sorts modded categories the way Fabric does), builds
- * the same {@link RawKeyMapping} with the plain vanilla constructor (so
- * NeoForge treats it as an ordinary vanilla mapping: universal conflict
- * context, no modifier, identical {@code isDown}/{@code consumeClick}), and
- * hands it to the shared {@link KeyDispatcher}. After that event a
- * registration throws, as Fabric's does once the options exist. The category
- * label key is {@code key.category.<modid>.main} on both loaders.</p>
- *
- * <p><b>Tick.</b> {@code ClientTickEvent.Post}, the end of every client tick,
- * where Fabric's {@code END_CLIENT_TICK} fires, except that NeoForge does not
- * post it before the first resource load has finished; held-key polling
- * during the loading overlay is the only thing that could notice.</p>
- *
- * <p><b>Not supported on NeoForge yet:</b> {@link BlockTints} and
- * {@link BlockFaceSampler} get backends whose every method throws
- * {@link UnsupportedOperationException} (NeoForge's tint registry takes static
- * source lists, so Ded's dynamic delegation needs a design of its own), and
- * {@link BlockModelWrappers} registrations are ignored, with one warning at
- * client setup if there are any. Mouse input needs nothing here: the shared
- * {@code MouseHandlerMixin} applies unchanged (deds_api.mixins.json).</p>
- *
- * <p>Constructed after {@link com.deds.api.neoforge.DedsApiNeoForge} (FML runs
- * a mod's all-dist entry class first) and before any consumer that declares
- * {@code ordering = "AFTER"} on deds_api, so such consumers find the key
- * backend installed. A consumer without that ordering may be constructed
- * before it, or at the same moment on another thread; the pending queues in
- * {@link ClientKeys} and {@link BlockTints} cover both, because the check,
- * the queueing and install's replay all happen under one lock per class, so
- * no registration can be lost or stranded.</p>
+ * {@code DedsApiFabricClient}. Where each client seam plugs in:
+ * <ul>
+ * <li><b>Client init</b> ({@code Deds.initClient}): every mod's queued client
+ *     setup runs at the end of NeoForge's registry window (see
+ *     {@link ClientInitQueue}), right after the block-entity-renderer and
+ *     fluid-rendering backends are installed, so their queued registrations
+ *     resolve and later ones apply at once.</li>
+ * <li><b>Keys</b>: queued until {@code RegisterKeyMappingsEvent} (the only
+ *     moment a mapping is both saved and loaded back), then created at
+ *     {@link EventPriority#LOWEST} under a real controls category per mod and
+ *     handed to the shared {@link KeyDispatcher}; a later registration
+ *     throws. Dispatch runs at {@code ClientTickEvent.Post}.</li>
+ * <li><b>Block model wrappers</b>: {@code ModelEvent.ModifyBakingResult},
+ *     after every bake: each baked block-state model is run through the
+ *     registered wrappers in order.</li>
+ * <li><b>Face sampler</b>: the shared sampler, its cache cleared at the start
+ *     of every model reload ({@code ModelEvent.RegisterStandalone}).</li>
+ * <li><b>Tints</b>: {@link NeoForgeBlockTints}, installed at the end of
+ *     {@code RegisterClientExtensionsEvent}.</li>
+ * <li><b>Fluid rendering</b>: {@link NeoForgeFluidRenderers}, fed to every
+ *     reload's {@code RegisterFluidModelsEvent}.</li>
+ * <li><b>Entity renderers and menu screens</b>: their facades call vanilla
+ *     directly (see those classes); nothing to install.</li>
+ * </ul>
  */
 @Mod(value = "deds_api", dist = Dist.CLIENT)
 public final class DedsApiNeoForgeClient {
@@ -100,13 +84,34 @@ public final class DedsApiNeoForgeClient {
     public DedsApiNeoForgeClient(IEventBus modBus) {
         Deds.LOGGER.info("Ded's API client initializing on NeoForge");
 
-        installBlockModelGlue(modBus);
+        // Face sampler: installed now (it resolves nothing until render time),
+        // cache dropped at the start of every model reload.
+        CachingBlockFaceSampler sampler = new CachingBlockFaceSampler();
+        BlockFaceSampler.install(sampler);
+        modBus.addListener(ModelEvent.RegisterStandalone.class,
+                event -> sampler.invalidate());
+        modBus.addListener(ModelEvent.ModifyBakingResult.class,
+                DedsApiNeoForgeClient::wrapModels);
+
+        NeoForgeBlockTints tints = new NeoForgeBlockTints();
+        modBus.addListener(EventPriority.LOWEST, RegisterClientExtensionsEvent.class,
+                tints::install);
+
+        NeoForgeFluidRenderers fluids = new NeoForgeFluidRenderers();
+        modBus.addListener(RegisterFluidModelsEvent.class, fluids::onRegisterFluidModels);
+
+        // The end of the registry window: install the backends that resolve
+        // handles, then run every mod's client init.
+        modBus.addListener(EventPriority.LOWEST, EntityAttributeCreationEvent.class, event -> {
+            BlockEntityRenderers.install(new VanillaBlockEntityRenderers());
+            FluidRenderers.install(fluids);
+            ClientInitQueue.runAll(event);
+        });
 
         ClientKeys.install(new ClientKeys.Backend() {
             @Override
             public void register(String modId, String name,
-                    ClientKeys.InputType type, int defaultCode,
-                    Runnable onPress) {
+                    ClientKeys.InputType type, int defaultCode, Runnable onPress) {
                 enqueue(new PendingKey(modId, name, type, defaultCode, onPress, null));
             }
 
@@ -123,8 +128,37 @@ public final class DedsApiNeoForgeClient {
         modBus.addListener(RegisterClientPayloadHandlersEvent.class,
                 NeoForgeClientNet::registerHandlers);
 
+        // NeoForge's controls screen can bind "modifier + key"; the raw
+        // polls (held bindings, mouse-bound presses) honour it as NeoForge's
+        // click path does.
+        KeyDispatcher.useModifierCheck(mapping ->
+                mapping.getKeyModifier().isActive(mapping.getKeyConflictContext()));
         NeoForge.EVENT_BUS.addListener(ClientTickEvent.Post.class,
                 event -> KeyDispatcher.tick(Minecraft.getInstance()));
+    }
+
+    /**
+     * Runs every baked block-state model through the registered wrappers with
+     * the shared {@link ModelWrapping} loop, the one the Fabric backend runs
+     * from {@code modifyBlockModelAfterBake}: registration order, each wrapper
+     * seeing the previous result, a wrapper that throws skipped for that
+     * state while the others still apply.
+     *
+     * <p>One NeoForge difference: the handful of vanilla special blocks whose
+     * item/entity models vanilla bakes before this event (chests, skulls,
+     * banners, shulker boxes and the like) keep their unwrapped model there.
+     * Wrappers only ever wrap their own mod's blocks.</p>
+     */
+    private static void wrapModels(ModelEvent.ModifyBakingResult event) {
+        ModelWrapping.beginReload();
+        if (BlockModelWrappers.registered().isEmpty()) {
+            return;
+        }
+        Map<BlockState, BlockStateModel> models =
+                event.getBakingResult().blockStateModels();
+        for (Map.Entry<BlockState, BlockStateModel> entry : models.entrySet()) {
+            entry.setValue(ModelWrapping.apply(entry.getKey(), entry.getValue()));
+        }
     }
 
     private static void enqueue(PendingKey key) {
@@ -132,8 +166,17 @@ public final class DedsApiNeoForgeClient {
             if (keysRegistered) {
                 throw new IllegalStateException("key binding key." + key.modId()
                         + "." + key.name() + " registered after NeoForge's "
-                        + "RegisterKeyMappingsEvent; register key bindings during "
-                        + "mod construction (a client entrypoint)");
+                        + "RegisterKeyMappingsEvent; register key bindings from "
+                        + "Deds.initClient");
+            }
+            // Fabric refuses a second mapping with the same name at the call;
+            // NeoForge would accept it and silently leave the first one dead
+            // (the second constructor replaces it in vanilla's name table).
+            for (PendingKey pending : PENDING) {
+                if (pending.modId().equals(key.modId()) && pending.name().equals(key.name())) {
+                    throw new IllegalArgumentException("Attempted to register two key "
+                            + "mappings with equal ID: key." + key.modId() + "." + key.name());
+                }
             }
             PENDING.add(key);
         }
@@ -167,60 +210,5 @@ public final class DedsApiNeoForgeClient {
             }
             PENDING.clear();
         }
-    }
-
-    /**
-     * The block-model/tint half of the client glue, which the Fabric backend
-     * implements with {@code ModelLoadingPlugin} and {@code BlockColorRegistry}.
-     * Neither has a NeoForge port yet (see the class javadoc), so the facades
-     * get backends that say so the moment a mod uses them, instead of a
-     * "used before the platform client bootstrap ran" error that would point
-     * at the wrong cause.
-     */
-    private static void installBlockModelGlue(IEventBus modBus) {
-        BlockFaceSampler.install(new BlockFaceSampler.Backend() {
-            @Override
-            public BlockStateModel modelOf(BlockState state) {
-                throw unsupported("BlockFaceSampler");
-            }
-
-            @Override
-            public BlockFaceSampler.Face[] facesOf(BlockState state, RandomSource random) {
-                throw unsupported("BlockFaceSampler");
-            }
-        });
-        BlockTints.install(new BlockTints.Backend() {
-            @Override
-            public void collect(BlockState state, BlockAndTintGetter level,
-                    BlockPos pos, IntList output) {
-                throw unsupported("BlockTints");
-            }
-
-            @Override
-            public void registerDelegating(BlockTints.AppearanceSource source,
-                    List<Block> blocks) {
-                throw unsupported("BlockTints");
-            }
-        });
-        // Wrappers are read at bake time, never pushed to a backend, so there
-        // is nothing to refuse at registration: warn once, when every client
-        // entrypoint has had its chance to register.
-        modBus.addListener(FMLClientSetupEvent.class, event -> {
-            int wrappers = BlockModelWrappers.registered().size();
-            if (wrappers > 0) {
-                Deds.LOGGER.warn("Ded's API {}: {} block model wrapper(s) registered, "
-                        + "but block model wrapping is not supported on NeoForge yet; "
-                        + "they are ignored", apiVersion(), wrappers);
-            }
-        });
-    }
-
-    private static UnsupportedOperationException unsupported(String what) {
-        return new UnsupportedOperationException("Ded's API " + apiVersion()
-                + " does not support " + what + " on NeoForge yet");
-    }
-
-    private static String apiVersion() {
-        return com.deds.api.neoforge.NeoForgePlatform.apiVersion();
     }
 }

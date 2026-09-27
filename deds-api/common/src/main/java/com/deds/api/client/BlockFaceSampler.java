@@ -24,12 +24,15 @@ import net.minecraft.world.level.block.state.BlockState;
  * Face materials are position-independent, so one entry serves every block
  * wearing that state. The trade-off is that a weighted-variant donor model is
  * sampled once instead of re-rolled per emission — a stable appearance,
- * arguably the better camouflage. The platform clears the cache at the start
- * of every model bake, so no sprite from a previous atlas survives a resource
+ * arguably the better camouflage. The cache is dropped whenever the game's
+ * models are rebuilt, so no sprite from a previous atlas survives a resource
  * reload.</p>
  *
  * <p>Thread note: called from chunk-meshing worker threads; the backend's
- * cache is concurrent and every value it holds is immutable.</p>
+ * cache is concurrent. Every {@link Face} is immutable and shared, and
+ * {@link #facesOf} hands each caller its OWN copy of the six-slot array, so
+ * writing into the array cannot change what anyone else gets (since v2.9;
+ * before, every caller shared the cached array itself).</p>
  *
  * <p>Lifted from Secret Rooms' {@code CamoRetexturedBlockStateModel} when
  * Carpenter's Blocks became the third consumer (MOD-COOKBOOK §14). The
@@ -73,7 +76,8 @@ public final class BlockFaceSampler {
      * the caller should fall back to its own textures.
      *
      * <p>Faces with no quad on that side borrow the model's particle sprite,
-     * so the returned array never contains nulls.</p>
+     * so the returned array never contains nulls. The array is a fresh copy
+     * each call (its {@link Face} values are the cached, shared ones).</p>
      */
     public static Face[] facesOf(BlockState state, RandomSource random) {
         checkInstalled();

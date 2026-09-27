@@ -4,6 +4,7 @@ import com.deds.api.DedsMod;
 import com.deds.api.ModContext;
 import com.deds.api.platform.Platform;
 
+import net.fabricmc.api.EnvType;
 import net.fabricmc.loader.api.FabricLoader;
 
 import java.nio.file.Path;
@@ -39,5 +40,17 @@ public final class FabricPlatform implements Platform {
         FabricModContext ctx = new FabricModContext(modId);
         mod.onInitialize(ctx);
         return ctx;
+    }
+
+    /**
+     * Fabric already runs every client entrypoint after every main one, so
+     * the setup runs right away; on a dedicated server it does not run at
+     * all, as on NeoForge.
+     */
+    @Override
+    public void initClient(String modId, Runnable init) {
+        if (FabricLoader.getInstance().getEnvironmentType() == EnvType.CLIENT) {
+            init.run();
+        }
     }
 }

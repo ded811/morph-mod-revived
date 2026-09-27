@@ -7,11 +7,17 @@ import com.deds.api.attach.PlayerDataSpec;
 import com.deds.api.command.CommandRegistrar;
 import com.deds.api.config.ConfigHandle;
 import com.deds.api.config.ConfigRegistrar;
+import com.deds.api.energy.EnergyPort;
+import com.deds.api.energy.EnergyRegistrar;
+import com.deds.api.energy.EnergyStorageView;
+import com.deds.api.entity.EntityRegistrar;
 import com.deds.api.fluid.FluidPort;
 import com.deds.api.fluid.FluidRegistrar;
 import com.deds.api.fluid.FluidTankView;
 import com.deds.api.id.BId;
 import com.deds.api.internal.JsonConfigFile;
+import com.deds.api.menu.MenuHandle;
+import com.deds.api.menu.MenuRegistrar;
 import com.deds.api.net.MessageType;
 import com.deds.api.net.NetRegistrar;
 import com.deds.api.registry.BlockEntityRegistrar;
@@ -22,6 +28,7 @@ import com.deds.api.registry.ItemRegistrar;
 import com.deds.api.registry.ItemSettings;
 import com.deds.api.registry.RegistryHandle;
 import com.deds.api.registry.TabRegistrar;
+import com.deds.api.worldgen.WorldgenRegistrar;
 
 import com.mojang.serialization.Codec;
 
@@ -29,11 +36,17 @@ import net.fabricmc.fabric.api.attachment.v1.AttachmentRegistry;
 import net.fabricmc.fabric.api.attachment.v1.AttachmentSyncPredicate;
 import net.fabricmc.fabric.api.attachment.v1.AttachmentTarget;
 import net.fabricmc.fabric.api.attachment.v1.AttachmentType;
+import net.fabricmc.fabric.api.biome.v1.BiomeModifications;
+import net.fabricmc.fabric.api.biome.v1.BiomeSelectors;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.creativetab.v1.CreativeModeTabEvents;
 import net.fabricmc.fabric.api.creativetab.v1.FabricCreativeModeTab;
+import net.fabricmc.fabric.api.menu.v1.ExtendedMenuType;
+import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.object.builder.v1.block.entity.FabricBlockEntityTypeBuilder;
+import net.fabricmc.fabric.api.object.builder.v1.entity.FabricDefaultAttributeRegistry;
 import net.fabricmc.fabric.api.registry.FlammableBlockRegistry;
+import net.fabricmc.fabric.api.tag.convention.v2.ConventionalBiomeTags;
 import net.fabricmc.fabric.api.transfer.v1.fluid.FluidStorage;
 import net.fabricmc.fabric.api.transfer.v1.fluid.FluidStorageUtil;
 import net.fabricmc.fabric.api.transfer.v1.fluid.FluidVariant;
@@ -48,11 +61,22 @@ import net.minecraft.core.Holder;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.MobCategory;
+import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.effect.MobEffect;
@@ -64,6 +88,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockBehaviour;
+import net.minecraft.world.level.levelgen.GenerationStep;
 import net.minecraft.world.level.material.Fluid;
 
 import org.slf4j.Logger;
@@ -72,6 +97,8 @@ import org.slf4j.LoggerFactory;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -82,7 +109,25 @@ import java.util.function.Supplier;
 final class FabricModContext implements ModContext, BlockRegistrar,
         ItemRegistrar, EffectRegistrar, TabRegistrar, BlockEntityRegistrar,
         PlayerDataRegistrar, NetRegistrar, CommandRegistrar, ConfigRegistrar,
-        FluidRegistrar {
+        FluidRegistrar, MenuRegistrar, EntityRegistrar {
+    // EnergyRegistrar is DELIBERATELY absent from the implements list, and it
+    // is the first registrar to break the everything-on-this pattern:
+    // EnergyRegistrar.port(Level, BlockPos, Direction) and
+    // FluidRegistrar.port(Level, BlockPos, Direction) share a parameter list
+    // and differ only in return type, which one class cannot implement twice
+    // (first :api:classes of v2.4, three named javac errors). energy()
+    // returns the dedicated FabricEnergyRegistrar below instead — invisible
+    // to consumers, who only ever see the interface. The NEXT registrar
+    // whose method shapes collide with an existing one should copy this
+    // pattern rather than renaming its API method: ctx.energy().port(...)
+    // and ctx.fluids().port(...) reading identically IS the design.
+    //
+    // v2.7 did NOT need a dedicated object and is not an exception to that
+    // rule: it adds an overload to FluidRegistrar, which is already in the
+    // implements list, and exposeTanks(handle, Function) /
+    // exposeTanks(handle, BiFunction) have different erasures for the second
+    // parameter, so they coexist on one class. A dedicated object is the
+    // answer to a COLLISION, not a house style.
 
     private final String modId;
     private final Logger logger;
@@ -152,6 +197,31 @@ final class FabricModContext implements ModContext, BlockRegistrar,
     @Override
     public FluidRegistrar fluids() {
         return this;
+    }
+
+    @Override
+    public MenuRegistrar menus() {
+        return this;
+    }
+
+    @Override
+    public EntityRegistrar entities() {
+        return this;
+    }
+
+    @Override
+    public EnergyRegistrar energy() {
+        // Not `this` — see the class-declaration comment: the port(...)
+        // signature collides with FluidRegistrar's on one class.
+        return energyRegistrar;
+    }
+
+    @Override
+    public WorldgenRegistrar worldgen() {
+        // A dedicated object like energy() — nothing collides this time,
+        // but the pattern is now the norm for new registrars: the implements
+        // list stays closed and the anonymous object is the whole backend.
+        return worldgenRegistrar;
     }
 
     // --- helpers ---
@@ -432,12 +502,44 @@ final class FabricModContext implements ModContext, BlockRegistrar,
         return new Handle<>(BId.of(modId, name), fluid);
     }
 
+    // The v2.1 one-argument form is now a THIN DELEGATE, not a second
+    // registration path: it wraps the caller's side-blind function in one that
+    // ignores the direction and hands it to the v2.7 overload below. One
+    // FluidStorage.SIDED registration, one combine(), one place for the null
+    // handling — so the two spellings cannot drift apart the way two copies
+    // would. (API-COMPATIBILITY §4: reshaping com.deds.api.fabric.** is free;
+    // the PUBLIC signature and behaviour of exposeTanks(handle, Function) are
+    // byte-for-byte what v2.1 shipped, which is the part that is not free.)
     @Override
     public <T extends BlockEntity> void exposeTanks(
             RegistryHandle<BlockEntityType<T>> type,
             Function<T, List<FluidTankView>> tanks) {
+        exposeTanks(type, (blockEntity, direction) -> tanks.apply(blockEntity));
+    }
+
+    // --- FluidRegistrar, the per-side overload (Ded's API v2.7) ---
+    //
+    // The direction handed to the mod's function is the lookup CONTEXT, and it
+    // is genuinely nullable — verified against the real jar rather than
+    // remembered (house rule 5, 2026-08-08): javap -v of
+    // net.fabricmc.fabric.api.transfer.v1.fluid.FluidStorage
+    // (fabric-transfer-api-v1 8.0.11, nested in fabric-api 0.155.2+26.2)
+    // prints SIDED's field type as BlockApiLookup<Storage<FluidVariant>,
+    // Direction> carrying a RuntimeVisibleTypeAnnotation
+    // org.jspecify.annotations.Nullable at TYPE_ARGUMENT(1) — i.e. the context
+    // type is @Nullable Direction. registerForBlockEntity's provider is
+    // BiFunction<? super T, C, A> (javap of BlockApiLookup,
+    // fabric-api-lookup-api-v1 2.0.17), so C IS what our BiFunction's second
+    // parameter receives, null and all. That is the same nullable context the
+    // energy seam has shipped on since v2.4, and it is what makes RF's
+    // ForgeDirection.UNKNOWN expressible on both seams.
+    @Override
+    public <T extends BlockEntity> void exposeTanks(
+            RegistryHandle<BlockEntityType<T>> type,
+            BiFunction<T, Direction, List<FluidTankView>> tanks) {
         FluidStorage.SIDED.registerForBlockEntity(
-                (blockEntity, direction) -> combine(tanks.apply(blockEntity)),
+                (blockEntity, direction) ->
+                        combine(tanks.apply(blockEntity, direction)),
                 type.get());
     }
 
@@ -461,9 +563,16 @@ final class FabricModContext implements ModContext, BlockRegistrar,
      * One tank becomes itself; several become a {@link TankChain} over them in
      * list order; none becomes {@code null}, which the lookup reads as "this
      * block has no fluid connection".
+     *
+     * <p>{@code null} in is the same as empty in, and that is contract, not
+     * defensiveness: the v2.7 per-side overload documents {@code null} and an
+     * empty list as interchangeable ways to say "no fluid connection on that
+     * side" — the wording the energy seam already uses for its {@code null}
+     * view. Collapsing them here is what makes the two spellings identical for
+     * every caller.</p>
      */
     private static Storage<FluidVariant> combine(List<FluidTankView> tanks) {
-        if (tanks.isEmpty()) {
+        if (tanks == null || tanks.isEmpty()) {
             return null;
         }
         if (tanks.size() == 1) {
@@ -547,6 +656,218 @@ final class FabricModContext implements ModContext, BlockRegistrar,
             return moved;
         }
     }
+
+    // --- MenuRegistrar (Ded's API v2.2) ---
+
+    @Override
+    public <T extends AbstractContainerMenu, D> MenuHandle<T, D> register(
+            String name,
+            StreamCodec<? super RegistryFriendlyByteBuf, D> dataCodec,
+            MenuRegistrar.Factory<T, D> factory) {
+        // ExtendedMenuType for EVERY menu, even one whose data is trivial.
+        // Vanilla's own MenuType constructor is private (javap) and its opening
+        // packet has no room for extra data at all, so the loader's subclass is
+        // the only thing that can carry a block position to the client. Mixing
+        // the two would also be a trap: the loader throws if an
+        // ExtendedMenuType is opened through a plain MenuProvider.
+        Identifier id = ident(name);
+        ExtendedMenuType<T, D> type =
+                new ExtendedMenuType<>(factory::create, dataCodec);
+        Registry.register(BuiltInRegistries.MENU,
+                ResourceKey.create(Registries.MENU, id), type);
+        return new MenuHandleImpl<>(BId.of(modId, name), type);
+    }
+
+    @Override
+    public <T extends AbstractContainerMenu, D> void open(ServerPlayer player,
+            MenuHandle<T, D> menu, Component title, D data) {
+        // Null data is silently fatal rather than loud: the loader's client
+        // handler treats a null payload as an unknown menu, logs one line and
+        // shows the player nothing at all. Fail here, at the call site, with
+        // the mod's own stack trace on it.
+        Objects.requireNonNull(data, "menu opening data must not be null");
+        if (!(menu instanceof MenuHandleImpl)) {
+            throw new IllegalArgumentException("menu handle " + menu.id()
+                    + " did not come from ModContext.menus().register()");
+        }
+        MenuHandleImpl<T, D> handle = (MenuHandleImpl<T, D>) menu;
+        player.openMenu(new FabricMenuOpening<>(handle.type(), title, data));
+    }
+
+    /**
+     * Keeps the loader's {@link ExtendedMenuType} — not just the vanilla
+     * {@link MenuType} the handle exposes — so {@link #open} can hand it the
+     * opening data without an unchecked cast.
+     */
+    private record MenuHandleImpl<T extends AbstractContainerMenu, D>(
+            BId id, ExtendedMenuType<T, D> type) implements MenuHandle<T, D> {
+        @Override
+        public MenuType<T> get() {
+            return type;
+        }
+    }
+
+    // --- EntityRegistrar (Ded's API v2.3) ---
+
+    @Override
+    public <T extends Entity> RegistryHandle<EntityType<T>> register(
+            String name, EntityType.EntityFactory<T> factory, float width,
+            float height) {
+        return new Handle<>(BId.of(modId, name),
+                buildEntityType(name, factory, width, height));
+    }
+
+    @Override
+    public <T extends LivingEntity> RegistryHandle<EntityType<T>>
+            registerLiving(String name, EntityType.EntityFactory<T> factory,
+                    float width, float height,
+                    Supplier<AttributeSupplier.Builder> attributes) {
+        EntityType<T> type = buildEntityType(name, factory, width, height);
+        // Registered immediately AFTER the type enters the registry, never
+        // before: the attribute table is keyed by the EntityType instance, so
+        // an entry can never reference a type that failed to register. This is
+        // the one genuinely loader-side half of the entity seam — vanilla's
+        // DefaultAttributes map is filled by a static initializer and has no
+        // public writer at all (javap), so without this a LivingEntity
+        // subclass NPEs the first time it reads an attribute.
+        FabricDefaultAttributeRegistry.register(type, attributes.get());
+        return new Handle<>(BId.of(modId, name), type);
+    }
+
+    /**
+     * The half {@code register} and {@code registerLiving} share: build the
+     * type with vanilla's own builder and put it in the registry.
+     *
+     * <p>{@link MobCategory#MISC} for every type, and an update interval of
+     * 1 rather than vanilla's default 3 — both deliberate, both argued in
+     * {@link EntityRegistrar}'s "what is deliberately NOT here". The tracking
+     * range IS vanilla's default (5 chunks = 80 blocks), which is wider than
+     * the 64 the originals asked for.</p>
+     */
+    private <T extends Entity> EntityType<T> buildEntityType(String name,
+            EntityType.EntityFactory<T> factory, float width, float height) {
+        Identifier id = ident(name);
+        ResourceKey<EntityType<?>> key =
+                ResourceKey.create(Registries.ENTITY_TYPE, id);
+        // build(key) rather than a bare constructor: the key is what vanilla
+        // resolves the datafixer choice type from AND what the default
+        // description id is derived from — build() calls
+        // Util.makeDescriptionId("entity", key.identifier()), i.e.
+        // "entity.<namespace>.<path>", which is the lang key each type needs
+        // (javap). EntityType's own constructor is fifteen positional
+        // arguments and is not something to hand-roll.
+        EntityType<T> type = EntityType.Builder.of(factory, MobCategory.MISC)
+                .sized(width, height)
+                .updateInterval(1)
+                .build(key);
+        Registry.register(BuiltInRegistries.ENTITY_TYPE, key, type);
+        return type;
+    }
+
+    @Override
+    public boolean spawn(ServerLevel level, Entity entity, double x, double y,
+            double z) {
+        // snapTo, not setPos: it also calls setOldPosAndRot(), so the entity's
+        // xOld/yOld/zOld start where it does. Those are the fields every
+        // observing client interpolates from (CLIENT-SERVER-PLAYBOOK §2), and
+        // leaving them at the origin makes the first rendered frame a streak
+        // from (0, 0, 0).
+        entity.snapTo(x, y, z);
+        // ServerLevel's override, not LevelWriter's `return false` default —
+        // which is the whole reason the parameter is typed ServerLevel.
+        return level.addFreshEntity(entity);
+    }
+
+    // --- EnergyRegistrar (Ded's API v2.4) ---
+    //
+    // The block half of THE bridge (FabricEnergyBridge): Team Reborn's
+    // EnergyStorage.SIDED is used as the one and only lookup — never a
+    // parallel deds lookup — so our machines, our ports and any third-party
+    // TR-speaking cable all resolve through the same table. Registering here
+    // IS being visible to the ecosystem; finding here IS seeing it.
+    //
+    // A DEDICATED OBJECT rather than methods on this class, and the reason
+    // is at the class declaration: EnergyRegistrar.port and
+    // FluidRegistrar.port share a parameter list with different return
+    // types, which one class cannot carry.
+
+    private final EnergyRegistrar energyRegistrar = new EnergyRegistrar() {
+
+        @Override
+        public <T extends BlockEntity> void exposeStorage(
+                RegistryHandle<BlockEntityType<T>> type,
+                BiFunction<T, Direction, EnergyStorageView> storage) {
+            team.reborn.energy.api.EnergyStorage.SIDED.registerForBlockEntity(
+                    (blockEntity, direction) -> {
+                        EnergyStorageView view =
+                                storage.apply(blockEntity, direction);
+                        return view == null ? null
+                                : new FabricEnergyStorage(view);
+                    }, type.get());
+        }
+
+        @Override
+        public EnergyPort port(Level level, BlockPos pos, Direction side) {
+            team.reborn.energy.api.EnergyStorage storage =
+                    team.reborn.energy.api.EnergyStorage.SIDED.find(level,
+                            pos, side);
+            return storage == null ? null : new FabricEnergyPort(storage);
+        }
+    };
+
+    // --- WorldgenRegistrar (Ded's API v2.5) ---
+    //
+    // A DEDICATED OBJECT like the energy registrar above — not because a
+    // signature collides this time, but because that precedent is the
+    // pattern for new registrars now: the implements list stays closed and
+    // the whole backend fits in the object. The seam itself is one call into
+    // the loader's biome-modification API; the feature being added is the
+    // MOD'S OWN datapack JSON, resolved through ident() into the mod's
+    // namespace exactly like every other name that crosses this class.
+    //
+    // Names verified against the real jars (house rule 5, 2026-08-07):
+    // BiomeModifications.addFeature(Predicate<BiomeSelectionContext>,
+    // GenerationStep.Decoration, ResourceKey<PlacedFeature>) and
+    // BiomeSelectors.tag(TagKey<Biome>) javap'd from
+    // fabric-biome-api-v1 18.0.6 (inside fabric-api 0.155.2+26.2);
+    // ConventionalBiomeTags.IS_OVERWORLD javap'd from
+    // fabric-convention-tags-v2 4.7.0; GenerationStep.Decoration
+    // .UNDERGROUND_ORES and Registries.PLACED_FEATURE javap'd from the
+    // 26.2 merged jar.
+    //
+    // WHY THE TAG SELECTOR AND NOT BiomeSelectors.foundInOverworld():
+    // foundInOverworld() is DYNAMIC — it asks the running server's overworld
+    // dimension which biomes its source can actually produce. The gametest
+    // server's overworld is a void world whose biome source is
+    // Fixed(plains), so the modification applied to plains and NOTHING
+    // ELSE — TEWorldgenGameTests failed on desert while plains passed,
+    // which is the exact fingerprint of this trap. The c:is_overworld
+    // convention tag is STATIC data: every vanilla overworld biome carries
+    // it, well-behaved modded overworld biomes (BOP etc.) tag themselves
+    // into it, and the answer is the same in a void test server and a real
+    // world. Same effective coverage, deterministic under test.
+    //
+    // Failure shape, read out of the loader's own source (the sources jar
+    // for the exact biome-api version above), because the WorldgenRegistrar
+    // Javadoc promises it: a key with no matching datapack JSON survives
+    // registration and throws IllegalArgumentException("Couldn't find
+    // holder for ...") when modifications are applied at world load
+    // (BiomeModificationContextImpl.getHolder), and adding a feature already
+    // present in the step is skipped, not doubled
+    // (GenerationSettingsContextImpl.addFeature's contains() early return).
+
+    private final WorldgenRegistrar worldgenRegistrar =
+            new WorldgenRegistrar() {
+
+        @Override
+        public void addOreToOverworld(String placedFeatureName) {
+            BiomeModifications.addFeature(
+                    BiomeSelectors.tag(ConventionalBiomeTags.IS_OVERWORLD),
+                    GenerationStep.Decoration.UNDERGROUND_ORES,
+                    ResourceKey.create(Registries.PLACED_FEATURE,
+                            ident(placedFeatureName)));
+        }
+    };
 
     // --- TabRegistrar ---
 

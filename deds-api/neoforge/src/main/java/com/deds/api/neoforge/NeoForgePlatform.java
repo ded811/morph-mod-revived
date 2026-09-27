@@ -4,14 +4,19 @@ import com.deds.api.DedsMod;
 import com.deds.api.ModContext;
 import com.deds.api.platform.Platform;
 
+import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.ModList;
 import net.neoforged.fml.loading.FMLEnvironment;
 import net.neoforged.fml.loading.FMLLoader;
 import net.neoforged.fml.loading.FMLPaths;
+import net.neoforged.neoforge.registries.RegisterEvent;
+
+import net.minecraft.core.registries.Registries;
 
 import java.nio.file.Path;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * NeoForge implementation of the Deds platform boundary. Discovered via
@@ -20,10 +25,43 @@ import java.nio.file.Path;
  * a class that is not in the jar (the Fabric platform, say) is a hard startup
  * failure, not a skipped entry. Never referenced by name outside this package.
  *
- * <p>Thread note: FML constructs mods IN PARALLEL (only BEFORE/AFTER ordering
- * edges serialize two mods), so {@link #initMod} can run for two Ded's mods at
- * the same time on different {@code modloading-worker} threads. Everything it
- * touches is per mod or concurrent.</p>
+ * <h2>When a mod's {@code onInitialize} runs</h2>
+ *
+ * <p>Not inside {@link #initMod}. FML constructs mods in PARALLEL, with every
+ * built-in registry frozen: constructing a Block, an Item or a Fluid at that
+ * point throws, and Ded's registrars register immediately, exactly as they do
+ * on Fabric. So {@link #initMod} builds the context and adds one listener to
+ * the mod's OWN event bus, at {@link EventPriority#LOWEST} of the first
+ * registry event ({@code RegisterEvent} for {@code minecraft:attribute}), and
+ * {@code onInitialize} runs there. At that point:</p>
+ * <ul>
+ * <li>every registry is writable (NeoForge unfreezes them all for the whole
+ *     registry window), so every registrar can do what the Fabric one does,
+ *     and a mod's own direct vanilla registrations (Thermal Expansion writes
+ *     its data components itself) work unchanged;</li>
+ * <li>it runs on FML's single "modloading-sync-worker" thread, one mod after
+ *     another in mod order, never in parallel;</li>
+ * <li>NeoForge's own attributes are already registered (they register at
+ *     NORMAL priority of the same event), so a living entity's attribute
+ *     supplier can be evaluated during {@code registerLiving}, as on
+ *     Fabric.</li>
+ * </ul>
+ * <p>Not available yet: anything NeoForge or another mod registers through a
+ * {@code DeferredRegister} for any registry other than attributes is still
+ * unbound, NeoForge's own fluid types included, so
+ * {@code Fluids.WATER.getFluidType()} there throws "Trying to access unbound
+ * value".</p>
+ *
+ * <p>The consequence a mod can see: on NeoForge {@code Deds.init} returns
+ * BEFORE {@code onInitialize} has run. Client code that needs the mod's
+ * content goes through {@link #initClient} ({@code Deds.initClient}), never a
+ * client constructor, and {@code Deds.init} itself must be called from the
+ * mod's constructor: once the registry events have begun it throws. An
+ * exception thrown by {@code onInitialize} is reported as a mod-loading error
+ * naming the mod; the rest of that event's lowest phase is skipped (later
+ * mods' {@code onInitialize} never run), NeoForge still posts the remaining
+ * registry events, then reports every error together and reverts the
+ * registries to vanilla.</p>
  */
 public final class NeoForgePlatform implements Platform {
 
@@ -66,14 +104,24 @@ public final class NeoForgePlatform implements Platform {
     }
 
     /**
-     * Builds the mod's context on the mod's OWN event bus (the registrars that
-     * must defer to a NeoForge registration event register their listeners
-     * there) and runs the mod's initialization, synchronously, exactly like
-     * the Fabric platform. Called from the mod's {@code @Mod} constructor, so
-     * {@link ModList} already holds the container.
+     * Builds the mod's context on the mod's OWN event bus and defers its
+     * {@code onInitialize} into the registry window (see the class javadoc).
+     * Called from the mod's {@code @Mod} constructor, so {@link ModList}
+     * already holds the container.
      */
+    /**
+     * Set once the first registry event is over (by {@link DedsApiNeoForge}):
+     * a context made after that would wait for an event that never comes.
+     */
+    static volatile boolean initEventPassed;
+
     @Override
     public ModContext initMod(String modId, DedsMod mod) {
+        if (initEventPassed) {
+            throw new IllegalStateException("Deds.init for mod '" + modId + "' called "
+                    + "after NeoForge's registry events began, so its onInitialize "
+                    + "could never run; call Deds.init from the mod's @Mod constructor");
+        }
         ModContainer container = ModList.get().getModContainerById(modId)
                 .orElseThrow(() -> new IllegalStateException("Ded's API: no "
                         + "NeoForge mod container for '" + modId + "'; call "
@@ -84,14 +132,30 @@ public final class NeoForgePlatform implements Platform {
                     + "' has no mod event bus (not a javafml mod?)");
         }
         NeoForgeModContext ctx = new NeoForgeModContext(modId, modBus);
-        mod.onInitialize(ctx);
+        AtomicBoolean ran = new AtomicBoolean();
+        modBus.addListener(EventPriority.LOWEST, RegisterEvent.class, event -> {
+            if (event.getRegistryKey().equals(Registries.ATTRIBUTE)
+                    && ran.compareAndSet(false, true)) {
+                mod.onInitialize(ctx);
+            }
+        });
         return ctx;
     }
 
     /**
-     * This API's own version (the deds_api mod's), for error messages about
-     * what it does not support yet. "unknown" only if asked before
-     * {@link ModList} exists. Public for the client package; not API.
+     * Queues {@code init} to run once every mod's {@code onInitialize} has run
+     * and before any client registration event (see {@link ClientInitQueue}).
+     * On a dedicated server there is no client to initialize, and the call
+     * does nothing.
+     */
+    @Override
+    public void initClient(String modId, Runnable init) {
+        ClientInitQueue.enqueue(modId, init);
+    }
+
+    /**
+     * This API's own version (the deds_api mod's), for error messages. Public
+     * for the client package; not API.
      */
     public static String apiVersion() {
         ModList mods = ModList.get();

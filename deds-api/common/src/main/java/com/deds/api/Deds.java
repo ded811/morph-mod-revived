@@ -52,8 +52,46 @@ public final class Deds {
     /**
      * Initializes a mod. Call exactly once per mod, from its loader
      * entrypoint.
+     *
+     * <p>When {@link DedsMod#onInitialize} runs depends on the loader. On
+     * Fabric it runs inside this call. On NeoForge it runs later, during
+     * NeoForge's registry events (the only time NeoForge lets anything be
+     * registered), after every mod has been constructed: this call returns
+     * first. Do not rely on the mod being initialized when it returns, and
+     * start the client half with {@link #initClient}, not in a client
+     * constructor.</p>
      */
     public static ModContext init(String modId, DedsMod mod) {
         return platform().initMod(modId, mod);
+    }
+
+    /**
+     * Runs a mod's client setup: key bindings, renderers, menu screens,
+     * tints, model wrappers, client message listeners (Ded's API v2.9). Call
+     * it from the mod's CLIENT entrypoint (Fabric's {@code client}
+     * entrypoint, NeoForge's {@code @Mod(dist = Dist.CLIENT)} constructor).
+     *
+     * <p>It keeps the rule Fabric gives for free, "every mod's
+     * {@link DedsMod#onInitialize} has run before any client setup", on every
+     * loader:</p>
+     * <ul>
+     * <li>Fabric: {@code init} runs right away (the client entrypoint is
+     *     already that moment).</li>
+     * <li>NeoForge: {@code init} is queued and runs once every mod's
+     *     {@code onInitialize} has run, before the game window, the key
+     *     options and the first resource load exist. It runs on NeoForge's
+     *     mod-loading thread, and {@code Minecraft.getInstance()} is still
+     *     {@code null} then, so touch the client only from inside the
+     *     callbacks you register. A call made from inside another mod's
+     *     client setup runs at once, as on Fabric; a call after every setup
+     *     has run throws.</li>
+     * <li>A dedicated server (either loader): {@code init} never runs.</li>
+     * </ul>
+     *
+     * @param modId the mod's id, as passed to {@link #init}
+     * @param init  the client setup
+     */
+    public static void initClient(String modId, Runnable init) {
+        platform().initClient(modId, init);
     }
 }

@@ -12,15 +12,6 @@ import net.minecraft.world.phys.BlockHitResult;
  * Player↔<i>block</i> interaction events (Ded's API v1.5), bridged from the
  * loader by the platform. Sibling of {@link InteractionEvents} (which covers
  * player↔entity), so mod code never imports {@code net.fabricmc.*}.
- *
- * <p><b>Fabric only, for now.</b> Neither event is bridged on NeoForge yet:
- * registering a listener works on both loaders, but on NeoForge nothing ever
- * fires it. NeoForge's {@code LeftClickBlock} / {@code RightClickBlock} are
- * not the same hooks (they fire for every break action, after or inside
- * vanilla's own checks, and a cancel neither resyncs the block nor stops the
- * client's packet), so bridging them would silently change both contracts
- * below; a faithful bridge mirrors Fabric API's mixins at the identical points
- * instead, and no mod that ships on NeoForge needs one yet.</p>
  */
 public final class PlayerEvents {
 
@@ -42,8 +33,7 @@ public final class PlayerEvents {
     }
 
     /**
-     * Fired when a player left-clicks (attacks) a block (Fabric only for now:
-     * not bridged on NeoForge, see the class javadoc). Register with
+     * Fired when a player left-clicks (attacks) a block. Register with
      * {@link Event#registerReturning}; the platform bridge fires it via
      * {@link Event#invokeUntil} with a {@link InteractionResult#PASS}
      * sentinel, so the first non-{@code PASS} result CANCELS the vanilla
@@ -78,8 +68,7 @@ public final class PlayerEvents {
 
     /**
      * Fired when a player right-clicks a block, BEFORE vanilla decides whether
-     * to consult the block at all (Fabric only for now: not bridged on
-     * NeoForge, see the class javadoc). Register with
+     * to consult the block at all. Register with
      * {@link Event#registerReturning}; the first non-{@link
      * InteractionResult#PASS} result becomes the interaction's result and
      * vanilla processing stops.

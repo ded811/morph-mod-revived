@@ -12,14 +12,12 @@ import org.lwjgl.glfw.GLFW;
  * The only part of the key machinery that differs between Minecraft versions:
  * reading a binding's raw device state, and mapping a {@link ClientKeys}
  * default onto the running version's {@code InputConstants}. Kept this small
- * on purpose, because it is the one key-machinery file (and the one file in
- * deds-api/common) with a per-version overlay.
+ * on purpose, because it is the one key-machinery file that has to change
+ * with the Minecraft version.
  *
- * <p>This is the canonical (26.2, GLFW) version.
- * {@code versions/mc26.3/deds-api/common/src/main/java/com/deds/api/internal/client/RawKeys.java}
- * is the 26.3 (SDL) one. Before the loader split the whole Fabric client
- * entrypoint was overlaid on 26.3 for these few lines; the logic of both
- * versions is unchanged.</p>
+ * <p>This is the 26.2 (GLFW) version. 26.3 moved input to SDL; a 26.3 build
+ * replaces this one file (the standalone Morph repository does it with a
+ * {@code versions/mc26.3} overlay) and the logic stays the same.</p>
  */
 final class RawKeys {
 

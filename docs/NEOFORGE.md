@@ -33,7 +33,7 @@ and the mixins are in `.../neoforge/mixin/`.
 | `InteractionEvents.USE_ENTITY`, client | `MinecraftUseEntityMixin`: at the `MultiPlayerGameMode.interact` call in `startUseItem`, like Fabric | on the client, `EntityInteract` fires after the interact packet was already sent, so a FAIL could not stop it |
 | Commands | `RegisterCommandsEvent` | (it matches: posted where Fabric's command callback fires, with the same three values) |
 | Client end of tick | `ClientTickEvent.Post` | (it matches, except that NeoForge does not post it before the first resource load finishes, when there is no world) |
-| `PlayerEvents.ATTACK_BLOCK`, `USE_BLOCK` | not bridged yet | see "What Ded's API does not do on NeoForge yet" |
+| `PlayerEvents.ATTACK_BLOCK`, `USE_BLOCK` | `ServerPlayerGameModeBlockMixin` (HEAD of `handleBlockBreakAction` and `useItemOn`) and, on the client, `MultiPlayerGameModeBlockMixin`, like Fabric (since 0.2.1) | `PlayerInteractEvent.LeftClickBlock` and `RightClickBlock` fire for every break action, later, and cancelling them neither resyncs the block nor stops what the client already did |
 
 Minecraft 26.3 changed the arm-swing API, so the client use-entity mixin has
 a 26.3 twin in `versions/mc26.3/deds-api/neoforge/`. Where Fabric API reads a
@@ -178,21 +178,23 @@ seam: its defaults are vanilla, which is what Fabric runs, and
   three ways would be three different morphs, so it is in
   `Morph.TRANSIENT_KEYS`. Fabric never writes it.
 
-## What Ded's API does not do on NeoForge yet
+## Ded's API on NeoForge
 
-Morph uses none of these. A future Ded's mod that needs one on NeoForge needs
-a design first.
+Since 0.2.1 the bundled Ded's API is 2.9.0, which supports every part of the
+API on NeoForge (0.2.0-beta's copy, 2.1.0, threw or did nothing for blocks,
+items, effects, creative tabs, block entities, fluids, block tints, the face
+sampler, model wrappers and the attack/use-block events). Morph uses none of
+those, so nothing changes for Morph itself. It matters for other mods built
+on Ded's API: NeoForge keeps only the newest nested copy of `deds_api`, and
+the copy inside Morph is now a complete one.
 
-- `ModContext.blocks()`, `items()`, `effects()`, `tabs()`,
-  `blockEntities()` and `fluids()` throw `UnsupportedOperationException`
-  (`Ded's API <version> does not support ... on NeoForge yet`). NeoForge only
-  takes registry entries inside `RegisterEvent`, and fluids use NeoForge's
-  own transfer API and units.
-- `BlockTints` and `BlockFaceSampler` throw the same kind of error from every
-  method. `BlockModelWrappers` registrations are ignored, with one warning in
-  the log at client setup.
-- `PlayerEvents.ATTACK_BLOCK` and `USE_BLOCK` are not bridged: their
-  listeners never fire on NeoForge.
+On NeoForge, 2.9.0 runs each mod's `onInitialize` inside NeoForge's registry
+events instead of from the mod's constructor. That is why Morph's client half
+starts from `RegisterKeyMappingsEvent` (see "The client" above).
+
+Minecraft 26.3 rebuilt the class that decides how fluids move an entity, so
+the API's hook that makes entities ignore its fluids has a 26.3 twin in
+`versions/mc26.3/deds-api/neoforge/`, like the use-entity hook.
 
 ## Data does not carry between loaders
 
